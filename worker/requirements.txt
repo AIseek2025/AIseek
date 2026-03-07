@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+edge-tts
+openai
+boto3
+requests
+python-dotenv
+pydantic
+pydantic-settings
+ffmpeg-python
+httpx
+celery
+redis
+sqlalchemy
+psycopg2-binary

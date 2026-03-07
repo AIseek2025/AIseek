@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=aiseek
+      - POSTGRES_PASSWORD=aiseek_password
+      - POSTGRES_DB=aiseek_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiseek -d aiseek_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    # Force uvicorn command
+    command: uvicorn app.main:app --host 0.0.0.0 --port 5000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "5001:5000"
+    environment:
+      - DATABASE_URL=postgresql://aiseek:aiseek_password@db:5432/aiseek_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - WORKER_SECRET=m3pro_worker_2026
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  backend_celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: celery -A app.core.celery_app.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://aiseek:aiseek_password@db:5432/aiseek_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  worker:
+    build: 
+      context: ./worker
+      dockerfile: Dockerfile
+    # In production, this would be a Celery worker
+    # For now, we keep the FastAPI worker but make it use Redis/Celery internally if we switch
+    # Or we can run Celery worker command: celery -A app.worker.celery worker --loglevel=info
+    command: celery -A app.worker.celery_app worker -Q ai,transcode --loglevel=info --concurrency=4 --prefetch-multiplier=1 --max-tasks-per-child=20
+    volumes:
+      - ./worker:/app
+      # Map hardware acceleration devices if needed (Linux)
+      # For Mac M3 Pro, we run worker locally outside Docker for HW accel usually, 
+      # but for architecture design we show it here.
+    environment:
+      - DATABASE_URL=postgresql://aiseek:aiseek_password@db:5432/aiseek_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - WEB_URL=http://backend:5000
+      - WORKER_SECRET=m3pro_worker_2026
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

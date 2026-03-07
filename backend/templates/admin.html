@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="aiseek-build" content="{{ build_id }}">
+    <title>AIseek Admin Dashboard</title>
+    <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #161823; color: #fff; }
+        .sidebar { width: 260px; background: #252632; height: 100vh; position: fixed; left: 0; top: 0; display: flex; flex-direction: column; }
+        .main-content { margin-left: 260px; padding: 24px; }
+        .nav-item { padding: 12px 24px; cursor: pointer; color: rgba(255,255,255,0.7); display: flex; align-items: center; gap: 10px; transition: 0.2s; }
+        .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.05); color: #fff; }
+        .nav-item.active { border-left: 3px solid #fe2c55; background: rgba(254,44,85,0.1); }
+        .card { background: #252632; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .stat-card { background: #252632; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .stat-val { font-size: 24px; font-weight: bold; }
+        .stat-label { color: rgba(255,255,255,0.5); font-size: 14px; }
+        .table-row { border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .table-row:hover { background: rgba(255,255,255,0.02); }
+        th { text-align: left; padding: 12px; color: rgba(255,255,255,0.5); font-weight: normal; font-size: 14px; }
+        td { padding: 12px; font-size: 14px; }
+        .badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .badge-green { background: rgba(0,255,0,0.1); color: #4ade80; }
+        .badge-red { background: rgba(255,0,0,0.1); color: #f87171; }
+        .badge-blue { background: rgba(0,0,255,0.1); color: #60a5fa; }
+        input, select { background: #161823; border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px 12px; border-radius: 6px; outline: none; }
+        input:focus { border-color: #fe2c55; }
+        .btn-primary { background: #fe2c55; color: white; padding: 8px 16px; border-radius: 6px; }
+        .btn-danger { background: rgba(255,59,48,0.15); color: #ff3b30; padding: 6px 12px; border-radius: 6px; }
+    </style>
+</head>
+<body data-aiseek-build="{{ build_id }}">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="p-6 text-2xl font-bold text-red-500 flex items-center gap-2">
+            <i class="fas fa-bolt"></i> AIseek Admin
+        </div>
+        
+        <div class="nav-item active" data-action="call" data-fn="switchTab" data-args='["dashboard"]'>
+            <i class="fas fa-chart-pie"></i> 仪表盘
+        </div>
+        <div class="nav-item" data-action="call" data-fn="switchTab" data-args='["users"]'>
+            <i class="fas fa-users"></i> 用户管理
+        </div>
+        <div class="nav-item" data-action="call" data-fn="switchTab" data-args='["content"]'>
+            <i class="fas fa-video"></i> 内容管理
+        </div>
+        <div class="nav-item" data-action="call" data-fn="switchTab" data-args='["ai_tasks"]'>
+            <i class="fas fa-robot"></i> AI任务监控
+        </div>
+        <div class="nav-item" data-action="call" data-fn="switchTab" data-args='["audit"]'>
+            <i class="fas fa-shield-alt"></i> 审核队列
+        </div>
+        <div class="nav-item" data-action="call" data-fn="switchTab" data-args='["system"]'>
+            <i class="fas fa-cogs"></i> 系统设置
+        </div>
+        <div class="nav-item" data-action="call" data-fn="switchTab" data-args='["api_monitor"]'>
+            <i class="fas fa-plug"></i> API监控
+        </div>
+        
+        <div class="mt-auto p-4">
+            <div class="flex items-center gap-3 p-3 rounded bg-gray-800">
+                <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">A</div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-bold truncate">Admin</div>
+                    <div class="text-xs text-gray-500">Super User</div>
+                </div>
+                <i class="fas fa-sign-out-alt cursor-pointer text-gray-500 hover:text-white" data-action="call" data-fn="adminLogout" data-args="[]"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center" style="display:none;">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-96">
+            <h2 class="text-2xl font-bold mb-6 text-center">管理员登录</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">用户名</label>
+                    <input id="admin_u" class="w-full" placeholder="admin" />
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">密码</label>
+                    <input id="admin_p" type="password" class="w-full" placeholder="••••••" />
+                </div>
+                <button data-action="call" data-fn="adminLogin" data-args="[]" class="w-full btn-primary py-2 mt-2">登录</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        
+        <!-- Dashboard Tab -->
+        <div id="tab_dashboard" class="tab-content">
+            <h1 class="text-2xl font-bold mb-6">平台概览</h1>
+            
+            <div class="grid grid-cols-6 gap-6 mb-8">
+                <div class="stat-card">
+                    <div class="stat-label">总用户数</div>
+                    <div class="stat-val" id="stat_users">-</div>
+                    <div class="text-green-400 text-xs">↑ 12% 较上周</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">今日活跃</div>
+                    <div class="stat-val" id="stat_dau">-</div>
+                    <div class="text-green-400 text-xs">↑ 5% 较昨日</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">累计内容数</div>
+                    <div class="stat-val" id="stat_posts">-</div>
+                    <div class="text-blue-400 text-xs">AI生成占比 68%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">待审核</div>
+                    <div class="stat-val text-yellow-400" id="stat_audit">-</div>
+                    <div class="text-gray-500 text-xs">积压量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">实时AI任务队列</div>
+                    <div class="stat-val text-blue-400" id="stat_ai_queue">-</div>
+                    <div class="text-gray-500 text-xs">queued + processing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">今日新注册</div>
+                    <div class="stat-val text-green-400" id="stat_new_users_today">-</div>
+                    <div class="text-gray-500 text-xs">新增用户</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6">
+                <div class="card">
+                    <h3 class="text-lg font-bold mb-4">实时AI任务队列</h3>
+                    <div id="dash_ai_tasks" class="space-y-3">
+                        <!-- Dynamic -->
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 class="text-lg font-bold mb-4">最新注册用户</h3>
+                    <div id="dash_new_users" class="space-y-3">
+                        <!-- Dynamic -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Tab -->
+        <div id="tab_users" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">用户管理</h1>
+                <div class="flex gap-2">
+                    <input placeholder="搜索用户ID/昵称..." class="w-64" id="user_search">
+                    <button class="btn-primary" data-action="call" data-fn="loadUsers" data-args="[]">搜索</button>
+                    <button class="btn-danger" data-action="call" data-fn="adminBulkBanUsers" data-args="[]" style="height:40px;">批量封禁</button>
+                </div>
+            </div>
+            
+            <div class="card overflow-hidden">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>用户</th>
+                            <th>统计</th>
+                            <th>注册时间</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTable"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Content Tab -->
+        <div id="tab_content" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">内容管理</h1>
+                <div class="flex gap-2">
+                    <select class="bg-gray-800 border-none" id="content_state">
+                        <option value="done">已发布</option>
+                        <option value="removed">已下架</option>
+                        <option value="deleted">已删除</option>
+                        <option value="">全部</option>
+                    </select>
+                    <select class="bg-gray-800 border-none" id="content_date_preset" data-action="call" data-fn="applyContentDatePreset" data-args="[]" style="min-width:120px;">
+                        <option value="">全部日期</option>
+                        <option value="today">今天</option>
+                        <option value="yesterday">昨天</option>
+                        <option value="7d">近7天</option>
+                        <option value="30d">近30天</option>
+                        <option value="custom">自定义</option>
+                    </select>
+                    <div id="content_date_range_box" style="display:none; gap:8px;" class="flex">
+                        <input type="date" class="w-40" id="content_date_start">
+                        <input type="date" class="w-40" id="content_date_end">
+                    </div>
+                    <input placeholder="搜索标题/摘要/正文..." class="w-64" id="content_search">
+                    <input placeholder="搜索作者用户名/昵称/AIseek号..." class="w-64" id="content_user_search">
+                    <button class="btn-primary" data-action="call" data-fn="loadContent" data-args="[]">查询</button>
+                    <button class="btn-danger" data-action="call" data-fn="adminBulkRemove" data-args="[]" style="height:40px;">批量下架</button>
+                    <button class="btn-danger" data-action="call" data-fn="adminBulkDelete" data-args="[]" style="height:40px;">批量删除</button>
+                    <button class="btn-danger" data-action="call" data-fn="adminBulkDeleteRemoved" data-args="[]" style="height:40px;">批量删除已下架</button>
+                </div>
+            </div>
+            <div class="card">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>封面/标题</th>
+                            <th>作者</th>
+                            <th>数据</th>
+                            <th>发布时间</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contentTable"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab_ai_tasks" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">AI任务监控</h1>
+                <div class="flex gap-2 items-center">
+                    <select class="bg-gray-800 border-none" id="ai_job_status">
+                        <option value="">全部状态</option>
+                        <option value="queued">排队中 queued</option>
+                        <option value="processing">处理中 processing</option>
+                        <option value="done">已完成 done</option>
+                        <option value="failed">失败 failed</option>
+                        <option value="cancelled">已取消 cancelled</option>
+                        <option value="needs_review">需复核 needs_review</option>
+                    </select>
+                    <input placeholder="用户ID" class="w-32" id="ai_job_user">
+                    <button class="btn-primary" data-action="call" data-fn="loadAITasks" data-args="[]">刷新</button>
+                </div>
+            </div>
+            <div class="flex gap-2 mb-4 flex-wrap">
+                <button class="btn-danger ai-status-chip" style="background: rgba(96,165,250,0.12); color:#93c5fd;" data-status="">全部</button>
+                <button class="btn-danger ai-status-chip" style="background: rgba(96,165,250,0.12); color:#93c5fd;" data-status="queued">排队中</button>
+                <button class="btn-danger ai-status-chip" style="background: rgba(96,165,250,0.12); color:#93c5fd;" data-status="processing">处理中</button>
+                <button class="btn-danger ai-status-chip" style="background: rgba(96,165,250,0.12); color:#93c5fd;" data-status="done">已完成</button>
+                <button class="btn-danger ai-status-chip" style="background: rgba(96,165,250,0.12); color:#93c5fd;" data-status="failed">失败</button>
+                <button class="btn-danger ai-status-chip" style="background: rgba(96,165,250,0.12); color:#93c5fd;" data-status="cancelled">已取消</button>
+                <button class="btn-danger ai-status-chip" style="background: rgba(96,165,250,0.12); color:#93c5fd;" data-status="needs_review">需复核</button>
+            </div>
+            <div class="card">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Job ID</th>
+                            <th>用户</th>
+                            <th>作品</th>
+                            <th>类型</th>
+                            <th>阶段</th>
+                            <th>进度</th>
+                            <th>状态</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="aiJobsTable"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab_audit" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">审核队列</h1>
+                <div class="flex gap-2 items-center">
+                    <select class="bg-gray-800 border-none" id="audit_status">
+                        <option value="pending">pending</option>
+                        <option value="approved">approved</option>
+                        <option value="rejected">rejected</option>
+                    </select>
+                    <button class="btn-primary" data-action="call" data-fn="loadAudit" data-args="[]">刷新</button>
+                </div>
+            </div>
+            <div class="card overflow-hidden">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Job</th>
+                            <th>用户</th>
+                            <th>作品</th>
+                            <th>原因</th>
+                            <th>自证</th>
+                            <th>时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditTable"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab_system" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">系统设置</h1>
+                <div class="flex gap-2 items-center">
+                    <select class="bg-gray-800 border-none" id="cb_metrics_days">
+                        <option value="7">近7天</option>
+                        <option value="14">近14天</option>
+                        <option value="30">近30天</option>
+                    </select>
+                    <button class="btn-danger" data-action="call" data-fn="exportWorkerCallbackSamples" data-args="[]" style="height:40px;">导出样例JSON</button>
+                    <button class="btn-primary" data-action="call" data-fn="saveWorkerCallbackThresholds" data-args="[]" style="height:40px;">保存阈值到服务器</button>
+                    <button class="btn-primary" data-action="call" data-fn="loadSystem" data-args="[]">刷新</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3 class="text-lg font-bold mb-2">前端静态资源版本</h3>
+                <div class="text-xs text-gray-500 mb-4">当前生效：<span id="assets_current_release" class="text-gray-300 font-mono">-</span></div>
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs text-gray-500">用于快速回滚前端版本（切换 manifest.current.json 指针）</div>
+                    <button class="btn-primary" data-action="call" data-fn="loadAssetReleases" data-args="[]" style="height:34px; padding:0 12px;">刷新版本</button>
+                </div>
+                <div class="overflow-hidden">
+                    <table class="w-full">
+                        <thead>
+                            <tr>
+                                <th>Release</th>
+                                <th>文件数</th>
+                                <th>更新时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assets_release_table"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card">
+                <h3 class="text-lg font-bold mb-2">灰度发布（Canary）</h3>
+                <div class="text-xs text-gray-500 mb-4">按 aiseek_sid 分桶，部分用户会加载 canary release 的静态资源。</div>
+                <div class="grid grid-cols-5 gap-4 items-end">
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">启用</div>
+                        <select class="bg-gray-800 border-none w-full" id="rollout_enabled">
+                            <option value="0">关闭</option>
+                            <option value="1">开启</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">百分比（0-100）</div>
+                        <input id="rollout_percent" class="w-full" placeholder="0" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">Canary Release</div>
+                        <select class="bg-gray-800 border-none w-full" id="rollout_release"></select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn-primary" data-action="call" data-fn="saveAssetsRollout" data-args="[]" style="height:34px; padding:0 12px;">保存灰度</button>
+                        <button class="btn-danger" data-action="call" data-fn="runAssetsRolloutGuard" data-args="[]" style="height:34px; padding:0 12px;">止血</button>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 mt-3">提示：切换灰度后，需要新开页面或强刷验证；止血会根据近期前端错误计数自动将灰度降为0。</div>
+            </div>
+            <div class="card">
+                <h3 class="text-lg font-bold mb-2">Feed 召回配置</h3>
+                <div class="text-xs text-gray-500 mb-4">用于控制候选召回来源（本地DB / 远程召回服务 / 自动回退）。</div>
+                <div class="grid grid-cols-4 gap-4 items-end">
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">Provider</div>
+                        <select class="bg-gray-800 border-none w-full" id="feed_recall_provider">
+                            <option value="local">local</option>
+                            <option value="auto">auto</option>
+                            <option value="remote">remote</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">百分比（0-100）</div>
+                        <input id="feed_recall_percent" class="w-full" placeholder="0" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">Kind</div>
+                        <select class="bg-gray-800 border-none w-full" id="feed_recall_kind">
+                            <option value="recent">recent</option>
+                            <option value="hot">hot</option>
+                            <option value="blend">blend</option>
+                        </select>
+                    </div>
+                    <div class="col-span-1">
+                        <div class="text-xs text-gray-400 mb-2">URL（remote/auto 使用）</div>
+                        <input id="feed_recall_url" class="w-full" placeholder="http://127.0.0.1:5999/recall" />
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn-primary" data-action="call" data-fn="saveFeedRecallConfig" data-args="[]" style="height:34px; padding:0 12px;">保存</button>
+                        <button class="btn-primary" data-action="call" data-fn="loadFeedRecallConfig" data-args="[]" style="height:34px; padding:0 12px;">刷新</button>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 mt-3">保存后即时生效；建议先用 auto 逐步放量，再切 remote。</div>
+            </div>
+            <div class="card">
+                <h3 class="text-lg font-bold mb-4">Worker 回调健康度</h3>
+                <div class="text-xs text-gray-500 mb-4">指标存储：<span id="cbm_storage" class="text-gray-300">-</span></div>
+                <div class="bg-gray-900 rounded p-4 mb-6">
+                    <div class="text-sm font-bold mb-3">阈值设置（黄/红）</div>
+                    <div class="grid grid-cols-4 gap-4">
+                        <div>
+                            <div class="text-xs text-gray-400 mb-2">dup</div>
+                            <div class="flex gap-2">
+                                <input id="cbm_th_dup_y" class="w-20" placeholder="黄" />
+                                <input id="cbm_th_dup_r" class="w-20" placeholder="红" />
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400 mb-2">job回退忽略</div>
+                            <div class="flex gap-2">
+                                <input id="cbm_th_ij_y" class="w-20" placeholder="黄" />
+                                <input id="cbm_th_ij_r" class="w-20" placeholder="红" />
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400 mb-2">post回退忽略</div>
+                            <div class="flex gap-2">
+                                <input id="cbm_th_ip_y" class="w-20" placeholder="黄" />
+                                <input id="cbm_th_ip_r" class="w-20" placeholder="红" />
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-400 mb-2">progress回退</div>
+                            <div class="flex gap-2">
+                                <input id="cbm_th_pr_y" class="w-20" placeholder="黄" />
+                                <input id="cbm_th_pr_r" class="w-20" placeholder="红" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-3">阈值保存在本地（浏览器）。</div>
+                </div>
+                <div class="grid grid-cols-4 gap-4 mb-6">
+                    <div class="stat-card">
+                        <div class="stat-label">重复回调（dup）</div>
+                        <div class="stat-val" id="cbm_dup">-</div>
+                        <div class="text-gray-500 text-xs">近N天汇总</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">状态回退忽略（job）</div>
+                        <div class="stat-val" id="cbm_ij">-</div>
+                        <div class="text-gray-500 text-xs">job_status_regress</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">状态回退忽略（post）</div>
+                        <div class="stat-val" id="cbm_ip">-</div>
+                        <div class="text-gray-500 text-xs">post_status_regress</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">进度回退拦截</div>
+                        <div class="stat-val" id="cbm_pr">-</div>
+                        <div class="text-gray-500 text-xs">progress_regress</div>
+                    </div>
+                </div>
+                <div class="overflow-hidden">
+                    <table class="w-full">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>dup</th>
+                                <th>job回退忽略</th>
+                                <th>post回退忽略</th>
+                                <th>progress回退</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cbm_table"></tbody>
+                    </table>
+                </div>
+                <div class="mt-6 overflow-hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-sm font-bold">最近回调样例</div>
+                        <div class="text-xs text-gray-500">仅展示被去重/被忽略/回退拦截的样例</div>
+                    </div>
+                    <table class="w-full">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>类型</th>
+                                <th>Job</th>
+                                <th>Post</th>
+                                <th>原因/状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cbm_samples"></tbody>
+                    </table>
+                </div>
+                <div class="mt-6 overflow-hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-sm font-bold">阈值告警</div>
+                        <div class="text-xs text-gray-500">当日首次跨越黄/红阈值会记录告警</div>
+                    </div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs text-gray-300 flex items-center gap-2">
+                                <input type="checkbox" id="cbm_alerts_only_unacked" style="width:14px; height:14px;" />
+                                只看未确认
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button class="btn-danger" data-action="call" data-fn="exportWorkerCallbackAlerts" data-args="[]" style="height:34px; padding:0 12px;">导出告警JSON</button>
+                            <button class="btn-danger" data-action="call" data-fn="ackFilteredWorkerCallbackAlerts" data-args="[]" style="height:34px; padding:0 12px;">确认当前筛选</button>
+                            <button class="btn-danger" data-action="call" data-fn="ackTodayWorkerCallbackAlerts" data-args="[]" style="height:34px; padding:0 12px;">确认今日全部</button>
+                        </div>
+                    </div>
+                    <table class="w-full">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>级别</th>
+                                <th>指标</th>
+                                <th>数值</th>
+                                <th>阈值</th>
+                                <th>Job</th>
+                                <th>Post</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cbm_alerts"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card mt-6">
+                <h3 class="text-lg font-bold mb-4">占位视频观测</h3>
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-sm font-bold">Provider 熔断状态</div>
+                    <button class="btn-secondary" data-action="call" data-fn="loadSystem" data-args="[]" style="height:34px; padding:0 12px;">刷新</button>
+                </div>
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Provider</th>
+                            <th>熔断</th>
+                            <th>open_until</th>
+                            <th>fail_count</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ph_providers"></tbody>
+                </table>
+                <div class="mt-6">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="text-sm font-bold">按 Job ID 检索 Trace/审计</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input class="input" id="ph_job_id" placeholder="job_id (UUID)" style="max-width:420px;">
+                        <button class="btn-primary" data-action="call" data-fn="loadPlaceholderJobTrace" data-args="[]" style="height:34px; padding:0 12px;">查询</button>
+                    </div>
+                    <pre id="ph_job_out" class="mt-3 text-xs text-gray-300" style="white-space:pre-wrap; background:#0b1220; border:1px solid rgba(255,255,255,0.08); padding:12px; border-radius:10px; min-height:96px;"></pre>
+                </div>
+
+                <div class="mt-8">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-sm font-bold">封面生成 Provider 熔断状态</div>
+                        <button class="btn-secondary" data-action="call" data-fn="loadSystem" data-args="[]" style="height:34px; padding:0 12px;">刷新</button>
+                    </div>
+                    <table class="w-full">
+                        <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>熔断</th>
+                                <th>open_until</th>
+                                <th>fail_count</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cv_providers"></tbody>
+                    </table>
+                    <div class="mt-6">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="text-sm font-bold">按 Job ID 检索封面 Trace</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input class="input" id="cv_job_id" placeholder="job_id (UUID)" style="max-width:420px;">
+                            <button class="btn-primary" data-action="call" data-fn="loadCoverJobTrace" data-args="[]" style="height:34px; padding:0 12px;">查询</button>
+                        </div>
+                        <pre id="cv_job_out" class="mt-3 text-xs text-gray-300" style="white-space:pre-wrap; background:#0b1220; border:1px solid rgba(255,255,255,0.08); padding:12px; border-radius:10px; min-height:96px;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab_api_monitor" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold">API监控板</h1>
+                <div class="flex gap-2 items-center">
+                    <button class="btn-primary" data-action="call" data-fn="loadApiMonitor" data-args="[]">刷新</button>
+                </div>
+            </div>
+            <div class="card overflow-hidden">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>API</th>
+                            <th>地址</th>
+                            <th>状态</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody id="apiMonTable"></tbody>
+                </table>
+            </div>
+            <div class="text-xs text-gray-500 mt-3" id="apiMonHint"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+        let currentTab = 'dashboard';
+
+        function getToken() { return localStorage.getItem('admin_token'); }
+        function setToken(t) { localStorage.setItem('admin_token', t); }
+
+        function checkAuth() {
+            if (!getToken()) {
+                document.getElementById('loginOverlay').style.display = 'flex';
+            } else {
+                document.getElementById('loginOverlay').style.display = 'none';
+                loadDashboard();
+            }
+        }
+
+        async function adminLogin() {
+            const u = document.getElementById('admin_u').value;
+            const p = document.getElementById('admin_p').value;
+            if (!u || !p) return alert('请输入用户名和密码');
+            
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || '登录失败');
+                
+                setToken(data.access_token);
+                checkAuth();
+            } catch(e) {
+                alert(e.message);
+            }
+        }
+
+        function adminLogout() {
+            localStorage.removeItem('admin_token');
+            location.reload();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab_${tab}`)?.classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            try {
+                const want = `["${String(tab)}"]`;
+                document.querySelectorAll('.nav-item').forEach(el => {
+                    const args = el.getAttribute('data-args') || '';
+                    if (args === want) el.classList.add('active');
+                });
+            } catch (_) {
+            }
+            
+            currentTab = tab;
+            if (tab === 'dashboard') loadDashboard();
+            if (tab === 'users') loadUsers();
+            if (tab === 'content') loadContent();
+            if (tab === 'ai_tasks') loadAITasks();
+            if (tab === 'audit') loadAudit();
+            if (tab === 'system') loadSystem();
+            if (tab === 'api_monitor') loadApiMonitor();
+        }
+
+        async function fetchAuth(url, opts={}) {
+            const token = getToken();
+            if(!token) return null;
+            opts.headers = { ...opts.headers, 'Authorization': `Bearer ${token}` };
+            return fetch(url, opts);
+        }
+
+        function escapeHtml(s) {
+            return String(s || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        async function loadDashboard() {
+            const res = await fetchAuth(`${API_BASE}/ops/admin/dashboard_overview`);
+            if (!res || !res.ok) return;
+            const out = await res.json();
+            document.getElementById('stat_users').innerText = Number(out && out.total_users || 0).toLocaleString();
+            document.getElementById('stat_dau').innerText = Number(out && out.today_active || 0).toLocaleString();
+            document.getElementById('stat_posts').innerText = Number(out && out.total_contents || 0).toLocaleString();
+            document.getElementById('stat_audit').innerText = Number(out && out.pending_review || 0).toLocaleString();
+            document.getElementById('stat_ai_queue').innerText = Number(out && out.ai_queue || 0).toLocaleString();
+            document.getElementById('stat_new_users_today').innerText = Number(out && out.today_registered || 0).toLocaleString();
+
+            const aiStatus = out && out.ai_status ? out.ai_status : {};
+            const aiRows = [
+                ['queued', '排队中'],
+                ['dispatch_pending', '待派发'],
+                ['processing', '处理中'],
+                ['done', '已完成'],
+                ['failed', '失败'],
+                ['cancelled', '已取消'],
+                ['needs_review', '需复核'],
+            ];
+            document.getElementById('dash_ai_tasks').innerHTML = aiRows.map(([k, label]) => `
+                <div class="flex items-center justify-between bg-gray-900 p-3 rounded">
+                    <div class="font-mono text-sm text-blue-300">${label}</div>
+                    <div class="text-xs text-gray-300">${Number(aiStatus[k] || 0).toLocaleString()}</div>
+                </div>
+            `).join('');
+
+            const latest = Array.isArray(out && out.latest_users) ? out.latest_users : [];
+            document.getElementById('dash_new_users').innerHTML = latest.length ? latest.map(u => `
+                <div class="flex items-center justify-between bg-gray-900 p-3 rounded">
+                    <div>
+                        <div class="text-sm">${escapeHtml(u.nickname || u.username || '')}</div>
+                        <div class="text-xs text-gray-500">${escapeHtml(u.username || '')}</div>
+                    </div>
+                    <div class="text-xs text-gray-400">${(u.created_at || '').replace('T',' ').slice(0,16)}</div>
+                </div>
+            `).join('') : '<div class="text-gray-500 text-sm">暂无新注册用户</div>';
+        }
+
+        async function loadUsers() {
+            const q = (document.getElementById('user_search')?.value || '').trim();
+            const url = q ? `${API_BASE}/users/all?q=${encodeURIComponent(q)}` : `${API_BASE}/users/all`;
+            const res = await fetchAuth(url);
+            if(!res || !res.ok) return;
+            const users = await res.json();
+            
+            document.getElementById('userTable').innerHTML = users.map(u => `
+                <tr class="table-row">
+                    <td><span class="font-mono text-xs text-gray-500">${u.id}</span></td>
+                    <td>
+                        <div class="flex items-center gap-2">
+                            <img src="${u.avatar || '/static/img/default_avatar.svg'}" class="w-8 h-8 rounded-full">
+                            <div>
+                                <div class="font-bold text-sm">${u.nickname || u.username}</div>
+                                <div class="text-xs text-gray-500">${u.username}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="text-xs text-gray-400">粉丝: ${u.followers_count}</div>
+                        <div class="text-xs text-gray-400">作品: 0</div>
+                        <div class="text-xs text-gray-400">信誉分: ${u.reputation_score ?? 100}</div>
+                    </td>
+                    <td class="text-gray-400 text-xs">${new Date(u.created_at).toLocaleDateString()}</td>
+                    <td><span class="badge ${u.is_active ? 'badge-green' : 'badge-red'}">${u.is_active ? '正常' : '封禁'}</span></td>
+                    <td>
+                        ${u.is_active
+                            ? `<button class="text-red-400 text-xs hover:underline ml-2" data-action="call" data-fn="adminBanUser" data-args="[${u.id}]" data-stop="1">封禁</button>`
+                            : `<button class="text-blue-400 text-xs hover:underline ml-2" data-action="call" data-fn="adminUnbanUser" data-args="[${u.id}]" data-stop="1">解封</button>`
+                        }
+                        <button class="text-yellow-300 text-xs hover:underline ml-2" data-action="call" data-fn="adminSetReputation" data-args="[${u.id}, ${u.reputation_score ?? 100}]" data-stop="1">改信誉分</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadContent() {
+            const q = (document.getElementById('content_search')?.value || '').trim();
+            const uq = (document.getElementById('content_user_search')?.value || '').trim();
+            const params = [];
+            params.push('limit=200');
+            const st = (document.getElementById('content_state')?.value || '').trim();
+            if (st) params.push(`status=${encodeURIComponent(st)}`);
+            const ds = (document.getElementById('content_date_start')?.value || '').trim();
+            const de = (document.getElementById('content_date_end')?.value || '').trim();
+            if (ds) params.push(`start_date=${encodeURIComponent(ds)}`);
+            if (de) params.push(`end_date=${encodeURIComponent(de)}`);
+            if (q) params.push(`q=${encodeURIComponent(q)}`);
+            if (uq) params.push(`username=${encodeURIComponent(uq)}`);
+            const res = await fetchAuth(`${API_BASE}/posts/admin/list?` + params.join('&')); 
+            if(!res) return;
+            const posts = await res.json(); // Array of posts
+            
+            document.getElementById('contentTable').innerHTML = posts.map(p => `
+                <tr class="table-row">
+                    <td><span class="font-mono text-xs text-gray-500">${p.id}</span></td>
+                    <td>
+                        <div class="flex gap-2">
+                            <div class="w-16 h-10 bg-gray-700 rounded overflow-hidden">
+                                <img src="${p.cover_url || (p.images?p.images[0]:'') || '/static/img/default_cover.jpg'}" class="w-full h-full object-cover">
+                            </div>
+                            <div class="w-48 truncate">
+                                <div class="text-sm truncate" title="${p.title}">${p.title || '无标题'}</div>
+                                <div class="text-xs text-gray-500">${p.category || '未分类'}</div>
+                                <div class="text-xs text-gray-500">${p.status || ''}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="text-sm">${p.user?.nickname || p.user?.username || 'Unknown'}</div>
+                        <div class="text-xs text-gray-500">${p.user?.username || ''}</div>
+                    </td>
+                    <td class="text-xs text-gray-400">
+                        <div>❤ ${p.likes_count}</div>
+                        <div>💬 ${p.comments_count}</div>
+                    </td>
+                    <td class="text-xs text-gray-400">${new Date(p.created_at).toLocaleDateString()}</td>
+                    <td><span class="badge ${p.status === 'done' ? 'badge-green' : 'badge-red'}">${p.status === 'done' ? '已发布' : (p.status || '未知')}</span></td>
+                    <td>
+                        ${p.status === 'done'
+                            ? `<button class="text-red-400 text-xs hover:underline" data-action="call" data-fn="adminRemovePost" data-args="[${p.id}]" data-stop="1">下架</button>
+                               <button class="text-red-400 text-xs hover:underline ml-2" data-action="call" data-fn="adminDeletePost" data-args="[${p.id}]" data-stop="1">删除</button>`
+                            : (p.status === 'removed'
+                                ? `<button class="text-blue-400 text-xs hover:underline" data-action="call" data-fn="adminRestorePost" data-args="[${p.id}]" data-stop="1">恢复上架</button>
+                                   <button class="text-red-400 text-xs hover:underline ml-2" data-action="call" data-fn="adminDeletePost" data-args="[${p.id}]" data-stop="1">删除</button>`
+                                : `<button class="text-blue-400 text-xs hover:underline" data-action="call" data-fn="adminRestorePost" data-args="[${p.id}]" data-stop="1">恢复上架</button>
+                                   <button class="text-red-400 text-xs hover:underline ml-2" data-action="call" data-fn="adminPurgePost" data-args="[${p.id}]" data-stop="1">永久删除</button>`)}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadAITasks() {
+            const st = (document.getElementById('ai_job_status')?.value || '').trim();
+            const uid = (document.getElementById('ai_job_user')?.value || '').trim();
+            const params = [];
+            params.push('limit=200');
+            if (st) params.push(`status=${encodeURIComponent(st)}`);
+            if (uid) params.push(`user_id=${encodeURIComponent(uid)}`);
+            const res = await fetchAuth(`${API_BASE}/ai/admin/jobs?` + params.join('&'));
+            if (!res || !res.ok) return;
+            const rows = await res.json();
+            const arr = Array.isArray(rows) ? rows : [];
+            document.getElementById('aiJobsTable').innerHTML = arr.map(j => `
+                <tr class="table-row">
+                    <td><span class="font-mono text-xs text-gray-500">${j.id}</span></td>
+                    <td class="text-xs text-gray-300">${j.user_id}</td>
+                    <td class="text-xs text-gray-300">${j.post_id || ''}</td>
+                    <td class="text-xs text-gray-300">${j.kind || ''}</td>
+                    <td class="text-xs text-gray-400">${j.stage || ''}</td>
+                    <td>
+                        <div class="w-24 bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-blue-500 h-full" style="width:${Math.max(0, Math.min(100, Number(j.progress||0)))}%"></div>
+                        </div>
+                    </td>
+                    <td><span class="badge ${j.status === 'done' ? 'badge-green' : (j.status === 'failed' ? 'badge-red' : 'badge-blue')}">${j.status || ''}</span></td>
+                    <td class="text-xs text-gray-500">${j.created_at ? new Date(j.created_at).toLocaleString() : ''}</td>
+                    <td class="text-xs text-gray-300">
+                        ${String(j.status||'') === 'processing'
+                            ? `<button class="text-red-400 text-xs hover:underline" data-action="call" data-fn="adminCancelAIJob" data-args='[${JSON.stringify(String(j.id || ""))}]' data-stop="1">取消</button>`
+                            : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function setAiJobStatus(st) {
+            try {
+                const el = document.getElementById('ai_job_status');
+                if (el) el.value = String(st || '');
+            } catch (_) {
+            }
+            try {
+                document.querySelectorAll('.ai-status-chip').forEach((btn) => {
+                    const v = String(btn.getAttribute('data-status') || '');
+                    const on = v === String(st || '');
+                    btn.style.background = on ? 'rgba(248,113,113,0.28)' : 'rgba(96,165,250,0.12)';
+                    btn.style.color = on ? '#fecaca' : '#93c5fd';
+                });
+            } catch (_) {
+            }
+            loadAITasks();
+        }
+
+        async function adminCancelAIJob(jobId) {
+            const jid = String(jobId || '').trim();
+            if (!jid) return;
+            if (!confirm(`确认取消任务 ${jid} 吗？`)) return;
+            const res = await fetchAuth(`${API_BASE}/ai/admin/jobs/${encodeURIComponent(jid)}/cancel`, { method: 'POST' });
+            if (!res || !res.ok) {
+                let msg = '取消失败';
+                try {
+                    const j = await res.json();
+                    if (j && (j.detail || j.message)) msg = String(j.detail || j.message);
+                } catch (_) {
+                }
+                return alert(msg);
+            }
+            await loadAITasks();
+        }
+
+        async function loadAudit() {
+            const st = (document.getElementById('audit_status')?.value || 'pending').trim();
+            const params = [];
+            params.push(`status=${encodeURIComponent(st)}`);
+            params.push('limit=200');
+            const res = await fetchAuth(`${API_BASE}/ai/admin/review/list?` + params.join('&'));
+            if (!res || !res.ok) return;
+            const rows = await res.json();
+            const arr = Array.isArray(rows) ? rows : [];
+            document.getElementById('auditTable').innerHTML = arr.map(c => {
+                const reasons = Array.isArray(c.reasons) ? c.reasons.map(r => (r && r.kind) ? r.kind : '').filter(Boolean).join(', ') : '';
+                const appeal = c.appeal && (c.appeal.statement || c.appeal.proof_url) ? '有' : '';
+                return `
+                    <tr class="table-row">
+                        <td><span class="font-mono text-xs text-gray-500">${c.id}</span></td>
+                        <td><span class="font-mono text-xs text-blue-300">${c.job_id}</span></td>
+                        <td class="text-xs text-gray-300">${c.user_id}</td>
+                        <td class="text-xs text-gray-300">${c.post_id || ''}</td>
+                        <td class="text-xs text-gray-400">${reasons}</td>
+                        <td class="text-xs text-gray-400">${appeal}</td>
+                        <td class="text-xs text-gray-500">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</td>
+                        <td class="text-xs">
+                            <button class="text-green-400 text-xs hover:underline" data-action="call" data-fn="adminReviewDecision" data-args="[${c.id},'approve']" data-stop="1">通过</button>
+                            <button class="text-red-400 text-xs hover:underline ml-2" data-action="call" data-fn="adminReviewDecision" data-args="[${c.id},'reject']" data-stop="1">拒绝</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function adminReviewDecision(checkId, action) {
+            const id = Number(checkId || 0);
+            const act = String(action || '').trim();
+            if (!id || (act !== 'approve' && act !== 'reject')) return;
+            let note = '';
+            try { note = String(prompt('可选：填写审核备注', '') || '').trim(); } catch (_) { note = ''; }
+            const res = await fetchAuth(`${API_BASE}/ai/admin/review/${id}/decision`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: act, note: note || null })
+            });
+            if (!res || !res.ok) return alert('操作失败');
+            loadAudit();
+        }
+
+        function getCbmThresholds() {
+            const def = { dup: { y: 5, r: 20 }, ij: { y: 2, r: 10 }, ip: { y: 2, r: 10 }, pr: { y: 2, r: 10 } };
+            try {
+                const raw = localStorage.getItem('cbm_thresholds');
+                if (!raw) return def;
+                const o = JSON.parse(raw);
+                const pick = (k) => {
+                    const v = o && o[k] && typeof o[k] === 'object' ? o[k] : {};
+                    const y = Number(v.y);
+                    const r = Number(v.r);
+                    return { y: Number.isFinite(y) ? y : def[k].y, r: Number.isFinite(r) ? r : def[k].r };
+                };
+                return { dup: pick('dup'), ij: pick('ij'), ip: pick('ip'), pr: pick('pr') };
+            } catch (_) {
+                return def;
+            }
+        }
+
+        function setCbmThresholds(v) {
+            try { localStorage.setItem('cbm_thresholds', JSON.stringify(v || {})); } catch (_) {}
+        }
+
+        function applyCbmThresholdInputs(v) {
+            const th = v || getCbmThresholds();
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = String(val); };
+            set('cbm_th_dup_y', th.dup.y); set('cbm_th_dup_r', th.dup.r);
+            set('cbm_th_ij_y', th.ij.y); set('cbm_th_ij_r', th.ij.r);
+            set('cbm_th_ip_y', th.ip.y); set('cbm_th_ip_r', th.ip.r);
+            set('cbm_th_pr_y', th.pr.y); set('cbm_th_pr_r', th.pr.r);
+        }
+
+        function readCbmThresholdInputs() {
+            const get = (id, defVal) => {
+                const el = document.getElementById(id);
+                const v = Number(el && el.value !== undefined ? el.value : defVal);
+                return Number.isFinite(v) ? v : defVal;
+            };
+            const def = getCbmThresholds();
+            return {
+                dup: { y: get('cbm_th_dup_y', def.dup.y), r: get('cbm_th_dup_r', def.dup.r) },
+                ij: { y: get('cbm_th_ij_y', def.ij.y), r: get('cbm_th_ij_r', def.ij.r) },
+                ip: { y: get('cbm_th_ip_y', def.ip.y), r: get('cbm_th_ip_r', def.ip.r) },
+                pr: { y: get('cbm_th_pr_y', def.pr.y), r: get('cbm_th_pr_r', def.pr.r) },
+            };
+        }
+
+        async function exportWorkerCallbackSamples() {
+            const d = Number(document.getElementById('cb_metrics_days')?.value || 7) || 7;
+            const res = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/samples?days=${encodeURIComponent(String(Math.min(3, d)))}&limit=200`);
+            if (!res || !res.ok) return alert('导出失败');
+            const data = await res.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `worker_callback_samples_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            try { a.remove(); } catch (_) {}
+            try { URL.revokeObjectURL(url); } catch (_) {}
+        }
+
+        async function loadAssetReleases() {
+            const tb = document.getElementById('assets_release_table');
+            if (tb) tb.innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载中...</td></tr>`;
+            const res = await fetchAuth(`${API_BASE}/ops/assets/releases`);
+            if (!res || !res.ok) {
+                if (tb) tb.innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载失败</td></tr>`;
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            const cur = data && data.current_release_id ? String(data.current_release_id) : '';
+            try {
+                const el = document.getElementById('assets_current_release');
+                if (el) el.innerText = cur || '-';
+            } catch (_) {
+            }
+            const arr = data && Array.isArray(data.releases) ? data.releases : [];
+            try {
+                const rsel = document.getElementById('rollout_release');
+                if (rsel) {
+                    const opts = arr.map(x => {
+                        const rid = x && x.release_id ? String(x.release_id) : '';
+                        return rid ? `<option value="${rid}">${rid}</option>` : '';
+                    }).join('');
+                    rsel.innerHTML = `<option value="">(请选择)</option>` + opts;
+                }
+            } catch (_) {
+            }
+            const rows = arr.map(it => {
+                const rid = it && it.release_id ? String(it.release_id) : '';
+                const c = Number(it && it.count || 0) || 0;
+                const mt = Number(it && it.mtime || 0) || 0;
+                const dt = mt ? new Date(mt * 1000).toLocaleString() : '';
+                const active = !!(it && it.active);
+                const act = active ? `<span class="text-xs text-green-400">已生效</span>` : `<button class="text-blue-400 text-xs hover:underline" data-action="call" data-fn="activateAssetRelease" data-args='[${JSON.stringify(rid)}]' data-stop="1">切换</button>`;
+                return `
+                    <tr class="table-row">
+                        <td class="text-xs text-gray-300 font-mono">${rid}</td>
+                        <td class="text-xs text-gray-300">${c}</td>
+                        <td class="text-xs text-gray-400">${dt}</td>
+                        <td class="text-xs text-gray-300">${act}</td>
+                    </tr>
+                `;
+            }).join('');
+            if (tb) tb.innerHTML = rows || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">暂无版本</td></tr>`;
+        }
+
+        async function activateAssetRelease(releaseId) {
+            const rid = String(releaseId || '').trim();
+            if (!rid) return;
+            const ok = confirm(`确定切换前端静态资源到版本：${rid}？\\n建议切换后刷新页面验证（recommend/profile/studio）。`);
+            if (!ok) return;
+            const res = await fetchAuth(`${API_BASE}/ops/assets/activate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ release_id: rid })
+            });
+            if (!res || !res.ok) return alert('切换失败');
+            await loadAssetReleases();
+            alert('已切换，建议刷新页面验证');
+        }
+
+        async function loadAssetsRollout() {
+            const res = await fetchAuth(`${API_BASE}/ops/assets/rollout`);
+            if (!res || !res.ok) return;
+            const data = await res.json().catch(() => ({}));
+            const enabled = !!(data && data.enabled);
+            const percent = Number(data && data.percent || 0) || 0;
+            const rid = data && data.canary_release_id ? String(data.canary_release_id) : '';
+            try {
+                const sel = document.getElementById('rollout_enabled');
+                if (sel) sel.value = enabled ? '1' : '0';
+            } catch (_) {}
+            try {
+                const inp = document.getElementById('rollout_percent');
+                if (inp) inp.value = String(Math.max(0, Math.min(100, percent)));
+            } catch (_) {}
+            try {
+                const rsel = document.getElementById('rollout_release');
+                if (rsel && rid) rsel.value = rid;
+            } catch (_) {}
+        }
+
+        async function saveAssetsRollout() {
+            const enabled = String(document.getElementById('rollout_enabled')?.value || '0') === '1';
+            const percent = Number(document.getElementById('rollout_percent')?.value || 0) || 0;
+            const rid = String(document.getElementById('rollout_release')?.value || '').trim();
+            const res = await fetchAuth(`${API_BASE}/ops/assets/rollout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled, percent, canary_release_id: rid || null })
+            });
+            if (!res || !res.ok) return alert('保存失败');
+            await loadAssetsRollout();
+            alert('已保存灰度，建议新开页面验证');
+        }
+
+        async function runAssetsRolloutGuard() {
+            const ok = confirm('执行止血检查？如果近期前端错误超过阈值，会自动把灰度降为0。');
+            if (!ok) return;
+            const res = await fetchAuth(`${API_BASE}/ops/assets/rollout/guard`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ minutes: 3, error_threshold: 20 })
+            });
+            if (!res || !res.ok) return alert('止血失败');
+            const data = await res.json().catch(() => ({}));
+            await loadAssetsRollout();
+            alert(`止血结果：${data.action || 'ok'}；errors=${data.errors || 0}`);
+        }
+
+        async function loadFeedRecallConfig() {
+            const res = await fetchAuth(`${API_BASE}/ops/feed/recall`);
+            if (!res || !res.ok) return;
+            const data = await res.json().catch(() => ({}));
+            const provider = data && data.provider ? String(data.provider) : 'local';
+            const url = data && data.url ? String(data.url) : '';
+            const percent = Number(data && data.percent || 0) || 0;
+            const kind = data && data.kind ? String(data.kind) : 'recent';
+            try {
+                const sel = document.getElementById('feed_recall_provider');
+                if (sel) sel.value = provider;
+            } catch (_) {}
+            try {
+                const inp = document.getElementById('feed_recall_url');
+                if (inp) inp.value = url;
+            } catch (_) {}
+            try {
+                const p = document.getElementById('feed_recall_percent');
+                if (p) p.value = String(Math.max(0, Math.min(100, percent)));
+            } catch (_) {}
+            try {
+                const k = document.getElementById('feed_recall_kind');
+                if (k) k.value = kind;
+            } catch (_) {}
+        }
+
+        async function saveFeedRecallConfig() {
+            const provider = String(document.getElementById('feed_recall_provider')?.value || 'local').trim();
+            const url = String(document.getElementById('feed_recall_url')?.value || '').trim();
+            const percent = Number(document.getElementById('feed_recall_percent')?.value || 0) || 0;
+            const kind = String(document.getElementById('feed_recall_kind')?.value || 'recent').trim();
+            const res = await fetchAuth(`${API_BASE}/ops/feed/recall`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, url: url || null, percent, kind })
+            });
+            if (!res || !res.ok) return alert('保存失败');
+            await loadFeedRecallConfig();
+            alert('已保存');
+        }
+
+        async function loadSystem() {
+            try { await loadAssetReleases(); } catch (_) {}
+            try { await loadAssetsRollout(); } catch (_) {}
+            try { await loadFeedRecallConfig(); } catch (_) {}
+            const d = Number(document.getElementById('cb_metrics_days')?.value || 7) || 7;
+            try {
+                const rth = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/thresholds`);
+                if (rth && rth.ok) {
+                    const j = await rth.json();
+                    const t = j && j.thresholds && typeof j.thresholds === 'object' ? j.thresholds : null;
+                    if (t) {
+                        setCbmThresholds(t);
+                        applyCbmThresholdInputs(getCbmThresholds());
+                    }
+                }
+            } catch (_) {
+            }
+            const th = readCbmThresholdInputs();
+            setCbmThresholds(th);
+            const res = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback?days=${encodeURIComponent(String(d))}`);
+            if (!res || !res.ok) return;
+            const data = await res.json();
+            const totals = data && typeof data === 'object' && data.totals && typeof data.totals === 'object' ? data.totals : {};
+            const series = data && typeof data === 'object' && Array.isArray(data.series) ? data.series : [];
+            const storage = data && typeof data === 'object' && data.storage ? String(data.storage) : '';
+            try {
+                const el = document.getElementById('cbm_storage');
+                if (el) {
+                    el.innerText = storage === 'redis' ? 'Redis' : (storage ? '本地降级' : '-');
+                    el.style.color = storage === 'redis' ? '#4ade80' : '#fbbf24';
+                }
+            } catch (_) {
+            }
+            const dup = Number(totals.dup || 0) || 0;
+            const ij = Number(totals.ignored_job_status_regress || 0) || 0;
+            const ip = Number(totals.ignored_post_status_regress || 0) || 0;
+            const pr = Number(totals.progress_regress || 0) || 0;
+            const paint = (id, v, redAt, yellowAt) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.innerText = String(v);
+                try { el.style.color = ''; } catch (_) {}
+                if (Number(v) >= Number(redAt)) {
+                    try { el.style.color = '#f87171'; } catch (_) {}
+                } else if (Number(v) >= Number(yellowAt)) {
+                    try { el.style.color = '#fbbf24'; } catch (_) {}
+                } else {
+                    try { el.style.color = '#4ade80'; } catch (_) {}
+                }
+            };
+            paint('cbm_dup', dup, th.dup.r, th.dup.y);
+            paint('cbm_ij', ij, th.ij.r, th.ij.y);
+            paint('cbm_ip', ip, th.ip.r, th.ip.y);
+            paint('cbm_pr', pr, th.pr.r, th.pr.y);
+            const rows = series.map(x => {
+                const day = x && x.day ? String(x.day) : '';
+                const m = x && x.metrics && typeof x.metrics === 'object' ? x.metrics : {};
+                const vdup = Number(m.dup || 0) || 0;
+                const vij = Number(m.ignored_job_status_regress || 0) || 0;
+                const vip = Number(m.ignored_post_status_regress || 0) || 0;
+                const vpr = Number(m.progress_regress || 0) || 0;
+                return `
+                    <tr class="table-row">
+                        <td class="text-xs text-gray-400">${day}</td>
+                        <td class="text-xs text-gray-300">${vdup}</td>
+                        <td class="text-xs text-gray-300">${vij}</td>
+                        <td class="text-xs text-gray-300">${vip}</td>
+                        <td class="text-xs text-gray-300">${vpr}</td>
+                    </tr>
+                `;
+            }).join('');
+            document.getElementById('cbm_table').innerHTML = rows || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="5">暂无数据</td></tr>`;
+            const res2 = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/samples?days=${encodeURIComponent(String(Math.min(3, d)))}&limit=30`);
+            if (!res2 || !res2.ok) {
+                document.getElementById('cbm_samples').innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="5">暂无样例</td></tr>`;
+                return;
+            }
+            const data2 = await res2.json();
+            const items = data2 && typeof data2 === 'object' && Array.isArray(data2.items) ? data2.items : [];
+            const sampleRows = items.map(it => {
+                const ts = Number(it.ts || 0) || 0;
+                const dt = ts ? new Date(ts * 1000).toLocaleString() : '';
+                const kind = it.kind ? String(it.kind) : '';
+                const p = it.payload && typeof it.payload === 'object' ? it.payload : {};
+                const jid = p.job_id ? String(p.job_id) : '';
+                const pid = (p.post_id !== undefined && p.post_id !== null) ? String(p.post_id) : '';
+                const reason = p.reason ? String(p.reason) : (p.status ? String(p.status) : '');
+                const color = kind === 'dup' ? 'text-blue-300' : (kind === 'ignored' ? 'text-yellow-300' : 'text-red-300');
+                return `
+                    <tr class="table-row">
+                        <td class="text-xs text-gray-400">${dt}</td>
+                        <td class="text-xs ${color}">${kind}</td>
+                        <td class="text-xs text-gray-300 font-mono">${jid}</td>
+                        <td class="text-xs text-gray-300">${pid}</td>
+                        <td class="text-xs text-gray-400">${reason}</td>
+                    </tr>
+                `;
+            }).join('');
+            document.getElementById('cbm_samples').innerHTML = sampleRows || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="5">暂无样例</td></tr>`;
+            const res3 = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/alerts?days=${encodeURIComponent(String(Math.min(7, d)))}&limit=50`);
+            if (!res3 || !res3.ok) {
+                document.getElementById('cbm_alerts').innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="7">暂无告警</td></tr>`;
+                return;
+            }
+            const data3 = await res3.json();
+            const aitems = data3 && typeof data3 === 'object' && Array.isArray(data3.items) ? data3.items : [];
+            const onlyUnacked = !!document.getElementById('cbm_alerts_only_unacked')?.checked;
+            const aarr = onlyUnacked ? aitems.filter(x => !(x && x.ack)) : aitems;
+            const alertRows = aarr.map(it => {
+                const ts = Number(it.ts || 0) || 0;
+                const dt = ts ? new Date(ts * 1000).toLocaleString() : '';
+                const level = it.level ? String(it.level) : '';
+                const key = it.key ? String(it.key) : '';
+                const value = Number(it.value || 0) || 0;
+                const thr = Number(it.threshold || 0) || 0;
+                const p = it.payload && typeof it.payload === 'object' ? it.payload : {};
+                const jid = p.job_id ? String(p.job_id) : '';
+                const pid = (p.post_id !== undefined && p.post_id !== null) ? String(p.post_id) : '';
+                const ack = !!it.ack;
+                const aid = it.id ? String(it.id) : '';
+                const color = level === 'red' ? 'text-red-300' : (level === 'yellow' ? 'text-yellow-300' : 'text-gray-300');
+                const day = it.day ? String(it.day) : (dt ? new Date(ts * 1000).toISOString().slice(0, 10).replace(/-/g, '') : '');
+                const act = ack ? `<span class="text-xs text-green-400">已确认</span>` : `<button class="text-blue-400 text-xs hover:underline" data-action="call" data-fn="ackWorkerCallbackAlert" data-args='[${JSON.stringify(day)}, ${JSON.stringify(aid)}]' data-stop="1">确认</button>`;
+                return `
+                    <tr class="table-row">
+                        <td class="text-xs text-gray-400">${dt}</td>
+                        <td class="text-xs ${color}">${level}</td>
+                        <td class="text-xs text-gray-300">${key}</td>
+                        <td class="text-xs text-gray-300">${value}</td>
+                        <td class="text-xs text-gray-400">${thr}</td>
+                        <td class="text-xs text-gray-300 font-mono">${jid}</td>
+                        <td class="text-xs text-gray-300">${pid} ${aid ? act : ''}</td>
+                    </tr>
+                `;
+            }).join('');
+            document.getElementById('cbm_alerts').innerHTML = alertRows || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="7">暂无告警</td></tr>`;
+            try {
+                const rph = await fetchAuth(`${API_BASE}/posts/admin/metrics/placeholder/providers`);
+                if (rph && rph.ok) {
+                    const j = await rph.json();
+                    const arr = j && Array.isArray(j.providers) ? j.providers : [];
+                    const rows2 = arr.map(it => {
+                        const p = it && it.provider ? String(it.provider) : '';
+                        const open = !!(it && it.circuit_open);
+                        const until = it && it.open_until ? new Date(Number(it.open_until) * 1000).toLocaleString() : '-';
+                        const fails = Number((it && it.fail_count) || 0) || 0;
+                        const c = open ? 'text-red-300' : 'text-green-300';
+                        return `
+                            <tr class="table-row">
+                                <td class="text-xs text-gray-300">${p}</td>
+                                <td class="text-xs ${c}">${open ? 'OPEN' : 'OK'}</td>
+                                <td class="text-xs text-gray-400">${until}</td>
+                                <td class="text-xs text-gray-300">${fails}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                    document.getElementById('ph_providers').innerHTML = rows2 || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">暂无数据</td></tr>`;
+                } else {
+                    document.getElementById('ph_providers').innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载失败</td></tr>`;
+                }
+            } catch (_) {
+                document.getElementById('ph_providers').innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载失败</td></tr>`;
+            }
+            try {
+                const rcv = await fetchAuth(`${API_BASE}/posts/admin/metrics/cover/providers`);
+                if (rcv && rcv.ok) {
+                    const j = await rcv.json();
+                    const arr = j && Array.isArray(j.providers) ? j.providers : [];
+                    const rows2 = arr.map(it => {
+                        const p = it && it.provider ? String(it.provider) : '';
+                        const open = !!(it && it.circuit_open);
+                        const until = it && it.open_until ? new Date(Number(it.open_until) * 1000).toLocaleString() : '-';
+                        const fails = Number((it && it.fail_count) || 0) || 0;
+                        const c = open ? 'text-red-300' : 'text-green-300';
+                        return `
+                            <tr class="table-row">
+                                <td class="text-xs text-gray-300">${p}</td>
+                                <td class="text-xs ${c}">${open ? 'OPEN' : 'OK'}</td>
+                                <td class="text-xs text-gray-400">${until}</td>
+                                <td class="text-xs text-gray-300">${fails}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                    document.getElementById('cv_providers').innerHTML = rows2 || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">暂无数据</td></tr>`;
+                } else {
+                    document.getElementById('cv_providers').innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载失败</td></tr>`;
+                }
+            } catch (_) {
+                document.getElementById('cv_providers').innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载失败</td></tr>`;
+            }
+        }
+
+        async function loadApiMonitor() {
+            const tb = document.getElementById('apiMonTable');
+            const hint = document.getElementById('apiMonHint');
+            if (tb) tb.innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载中...</td></tr>`;
+            if (hint) hint.innerText = '';
+            const res = await fetchAuth(`${API_BASE}/ops/admin/api_health`);
+            if (!res || !res.ok) {
+                if (tb) tb.innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载失败</td></tr>`;
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            const arr = data && Array.isArray(data.apis) ? data.apis : [];
+            const ts = Number(data && data.ts || 0) || 0;
+            try {
+                if (hint) hint.innerText = ts ? `最后检测：${new Date(ts * 1000).toLocaleString()}` : '';
+            } catch (_) {
+            }
+            const rows = arr.map(x => {
+                const name = x && x.name ? String(x.name) : '';
+                const url = x && x.url ? String(x.url) : '';
+                const ok = !!(x && x.ok);
+                const code = x && x.status_code !== undefined && x.status_code !== null ? String(x.status_code) : '';
+                const err = x && x.error ? String(x.error) : '';
+                const h = x && x.hint ? String(x.hint) : '';
+                const dot = ok ? 'bg-blue-400' : 'bg-red-400';
+                const label = ok ? '连接正常' : '连接失败';
+                const note = err ? err : (code ? `HTTP ${code}` : (h || ''));
+                return `
+                    <tr class="table-row">
+                        <td class="text-sm text-gray-200">${name}</td>
+                        <td class="text-xs text-gray-400 font-mono break-all">${url}</td>
+                        <td class="text-sm text-gray-200">
+                            <span class="inline-block w-2 h-2 rounded-full ${dot}" style="margin-right:8px; vertical-align:middle;"></span>
+                            ${label}
+                        </td>
+                        <td class="text-xs text-gray-400 break-all">${note}</td>
+                    </tr>
+                `;
+            }).join('');
+            if (tb) tb.innerHTML = rows || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">暂无数据</td></tr>`;
+        }
+
+        async function loadPlaceholderJobTrace() {
+            const jid = String(document.getElementById('ph_job_id')?.value || '').trim();
+            if (!jid) return;
+            const el = document.getElementById('ph_job_out');
+            if (el) el.textContent = '加载中...';
+            try {
+                const res = await fetchAuth(`${API_BASE}/posts/admin/metrics/placeholder/jobs/${encodeURIComponent(jid)}`);
+                const j = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error((j && j.detail) ? String(j.detail) : '查询失败');
+                if (el) el.textContent = JSON.stringify(j, null, 2);
+            } catch (e) {
+                if (el) el.textContent = String((e && e.message) || '查询失败');
+            }
+        }
+
+        async function loadCoverJobTrace() {
+            const jid = String(document.getElementById('cv_job_id')?.value || '').trim();
+            if (!jid) return;
+            const el = document.getElementById('cv_job_out');
+            if (el) el.textContent = '加载中...';
+            try {
+                const res = await fetchAuth(`${API_BASE}/posts/admin/metrics/cover/jobs/${encodeURIComponent(jid)}`);
+                const j = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error((j && j.detail) ? String(j.detail) : '查询失败');
+                if (el) el.textContent = JSON.stringify(j, null, 2);
+            } catch (e) {
+                if (el) el.textContent = String((e && e.message) || '查询失败');
+            }
+        }
+
+        async function ackWorkerCallbackAlert(day, alertId) {
+            const d = String(day || '').trim();
+            const id = String(alertId || '').trim();
+            if (!d || !id) return;
+            const res = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/alerts/${encodeURIComponent(d)}/${encodeURIComponent(id)}/ack`, { method: 'POST' });
+            if (!res || !res.ok) return alert('确认失败');
+            if (currentTab === 'system') loadSystem();
+        }
+
+        async function ackTodayWorkerCallbackAlerts() {
+            const now = new Date();
+            const day = now.toISOString().slice(0, 10).replace(/-/g, '');
+            if (!confirm(`确认将今日告警全部标记为已确认吗？(${day})`)) return;
+            const res = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/alerts/${encodeURIComponent(day)}/ack_all`, { method: 'POST' });
+            if (!res || !res.ok) return alert('操作失败');
+            if (currentTab === 'system') loadSystem();
+        }
+
+        async function exportWorkerCallbackAlerts() {
+            const d = Number(document.getElementById('cb_metrics_days')?.value || 7) || 7;
+            const onlyUnacked = !!document.getElementById('cbm_alerts_only_unacked')?.checked;
+            const url = `${API_BASE}/posts/admin/metrics/worker-callback/alerts?days=${encodeURIComponent(String(Math.min(30, d)))}&limit=300&include_acked=${encodeURIComponent(String(!onlyUnacked))}`;
+            const res = await fetchAuth(url);
+            if (!res || !res.ok) return alert('导出失败');
+            const data = await res.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+            const obj = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = obj;
+            a.download = `worker_callback_alerts_${new Date().toISOString().slice(0,10)}${onlyUnacked ? '_unacked' : ''}.json`;
+            document.body.appendChild(a);
+            a.click();
+            try { a.remove(); } catch (_) {}
+            try { URL.revokeObjectURL(obj); } catch (_) {}
+        }
+
+        async function ackFilteredWorkerCallbackAlerts() {
+            const d = Number(document.getElementById('cb_metrics_days')?.value || 7) || 7;
+            const onlyUnacked = !!document.getElementById('cbm_alerts_only_unacked')?.checked;
+            if (!confirm(`确认将当前筛选的告警全部标记为已确认吗？`)) return;
+            const url = `${API_BASE}/posts/admin/metrics/worker-callback/alerts?days=${encodeURIComponent(String(Math.min(30, d)))}&limit=300&include_acked=${encodeURIComponent(String(!onlyUnacked))}`;
+            const res = await fetchAuth(url);
+            if (!res || !res.ok) return alert('查询失败');
+            const data = await res.json();
+            const items = data && typeof data === 'object' && Array.isArray(data.items) ? data.items : [];
+            const arr = [];
+            for (const it of items) {
+                if (!it || typeof it !== 'object') continue;
+                if (onlyUnacked && it.ack) continue;
+                if (!it.id || !it.day) continue;
+                arr.push({ day: String(it.day), id: String(it.id) });
+            }
+            if (!arr.length) return alert('没有可确认的告警');
+            const res2 = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/alerts/ack_batch`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items: arr })
+            });
+            if (!res2 || !res2.ok) return alert('确认失败');
+            if (currentTab === 'system') loadSystem();
+        }
+
+        async function saveWorkerCallbackThresholds() {
+            const th = readCbmThresholdInputs();
+            const res = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/thresholds`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ thresholds: th })
+            });
+            if (!res || !res.ok) return alert('保存失败');
+            const data = await res.json();
+            if (data && data.thresholds) {
+                setCbmThresholds(data.thresholds);
+                applyCbmThresholdInputs(getCbmThresholds());
+            }
+            alert('已保存');
+        }
+
+        async function adminBanUser(userId) {
+            if (!userId) return;
+            if (!confirm(`确认封禁用户 ${userId} 吗？`)) return;
+            const res = await fetchAuth(`${API_BASE}/users/${userId}/ban`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            if (!res || !res.ok) return alert('封禁失败');
+            loadUsers();
+        }
+
+        async function adminSetReputation(userId, currentScore) {
+            const id = Number(userId || 0) || 0;
+            if (!id) return;
+            const cur = Number(currentScore);
+            const val = prompt('设置用户信誉分（0-100）：', Number.isFinite(cur) ? String(cur) : '100');
+            if (val == null) return;
+            const score = Math.max(0, Math.min(100, parseInt(String(val), 10) || 0));
+            const reason = prompt('修改原因（可选）：', '手动调整') || '';
+            const res = await fetchAuth(`${API_BASE}/users/${id}/reputation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reputation_score: score, reason, clear_ban: true, reactivate: true })
+            });
+            if (!res) return alert('未登录或网络错误');
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.detail ? JSON.stringify(data.detail) : '修改失败');
+            await loadUsers();
+        }
+
+        async function adminUnbanUser(userId) {
+            if (!userId) return;
+            const res = await fetchAuth(`${API_BASE}/users/${userId}/unban`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            if (!res || !res.ok) return alert('解封失败');
+            loadUsers();
+        }
+
+        async function adminBulkBanUsers() {
+            const q = (document.getElementById('user_search')?.value || '').trim();
+            if (!q) return alert('请先输入搜索关键词（例如 usmoke_）');
+            if (!confirm(`确认批量封禁匹配用户吗？`)) return;
+            const res = await fetchAuth(`${API_BASE}/users/bulk_ban`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ q, limit: 5000 })
+            });
+            if (!res || !res.ok) return alert('批量封禁失败');
+            const data = await res.json();
+            alert(`已封禁 ${data.count || 0} 个账号`);
+            loadUsers();
+        }
+
+        async function adminRemovePost(postId) {
+            if (!postId) return;
+            if (!confirm(`确认下架内容 ${postId} 吗？`)) return;
+            const res = await fetchAuth(`${API_BASE}/posts/${postId}/admin_remove`, { method: 'POST' });
+            if (!res || !res.ok) return alert('下架失败');
+            loadContent();
+        }
+
+        async function adminRestorePost(postId) {
+            if (!postId) return;
+            if (!confirm(`确认恢复上架内容 ${postId} 吗？`)) return;
+            const res = await fetchAuth(`${API_BASE}/posts/${postId}/admin_restore`, { method: 'POST' });
+            if (!res || !res.ok) return alert('恢复失败');
+            loadContent();
+        }
+
+        async function adminDeletePost(postId) {
+            if (!postId) return;
+            if (!confirm(`确认删除内容 ${postId} 吗？删除后会出现在“已删除”分类。`)) return;
+            const res = await fetchAuth(`${API_BASE}/posts/${postId}/admin_soft_delete`, { method: 'POST' });
+            if (!res || !res.ok) return alert('删除失败');
+            loadContent();
+        }
+
+        async function adminPurgePost(postId) {
+            if (!postId) return;
+            if (!confirm(`确认永久删除内容 ${postId} 吗？此操作不可恢复。`)) return;
+            const res = await fetchAuth(`${API_BASE}/posts/${postId}/admin_delete`, { method: 'DELETE' });
+            if (!res || !res.ok) return alert('永久删除失败');
+            loadContent();
+        }
+
+        async function adminBulkRemove() {
+            const q = (document.getElementById('content_search')?.value || '').trim();
+            const uq = (document.getElementById('content_user_search')?.value || '').trim();
+            const ds = (document.getElementById('content_date_start')?.value || '').trim();
+            const de = (document.getElementById('content_date_end')?.value || '').trim();
+            if (!q && !uq && !ds && !de) return alert('请先选择日期或输入关键词/作者条件再批量下架');
+            if (!confirm(`确认批量下架匹配内容吗？`)) return;
+            const res = await fetchAuth(`${API_BASE}/posts/admin/bulk_remove`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ q, username: uq, status: 'done', start_date: ds || null, end_date: de || null, limit: 2000 })
+            });
+            if (!res || !res.ok) return alert('批量下架失败');
+            const data = await res.json();
+            alert(`已下架 ${data.count || 0} 条内容`);
+            loadContent();
+        }
+
+        async function adminBulkDelete() {
+            const q = (document.getElementById('content_search')?.value || '').trim();
+            const uq = (document.getElementById('content_user_search')?.value || '').trim();
+            const st = (document.getElementById('content_state')?.value || '').trim();
+            if (!st && !q && !uq) return alert('请先选择分类或输入关键词/作者条件再批量删除');
+            if (!confirm(`确认批量删除匹配内容吗？删除后会出现在“已删除”分类。`)) return;
+            const ds = (document.getElementById('content_date_start')?.value || '').trim();
+            const de = (document.getElementById('content_date_end')?.value || '').trim();
+            const res = await fetchAuth(`${API_BASE}/posts/admin/bulk_delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ q, username: uq, status: st || null, start_date: ds || null, end_date: de || null, limit: 2000 })
+            });
+            if (!res || !res.ok) {
+                let msg = '批量删除失败';
+                try {
+                    const j = await res.json();
+                    if (j && (j.detail || j.message)) msg = String(j.detail || j.message);
+                } catch (_) {
+                }
+                return alert(msg);
+            }
+            const data = await res.json();
+            alert(`已删除 ${data.count || 0} 条内容`);
+            loadContent();
+        }
+
+        async function adminBulkDeleteRemoved() {
+            const q = (document.getElementById('content_search')?.value || '').trim();
+            const uq = (document.getElementById('content_user_search')?.value || '').trim();
+            const ds = (document.getElementById('content_date_start')?.value || '').trim();
+            const de = (document.getElementById('content_date_end')?.value || '').trim();
+            if (!confirm(`确认批量删除“已下架”内容吗？删除后会出现在“已删除”分类。`)) return;
+            const res = await fetchAuth(`${API_BASE}/posts/admin/bulk_delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ q, username: uq, status: 'removed', start_date: ds || null, end_date: de || null, limit: 2000 })
+            });
+            if (!res || !res.ok) {
+                let msg = '批量删除失败';
+                try {
+                    const j = await res.json();
+                    if (j && (j.detail || j.message)) msg = String(j.detail || j.message);
+                } catch (_) {
+                }
+                return alert(msg);
+            }
+            const data = await res.json();
+            try {
+                const sel = document.getElementById('content_state');
+                if (sel) sel.value = 'removed';
+            } catch (_) {
+            }
+            alert(`已删除 ${data.count || 0} 条已下架内容`);
+            loadContent();
+        }
+
+        function applyContentDatePreset() {
+            const sel = document.getElementById('content_date_preset');
+            const s = document.getElementById('content_date_start');
+            const e = document.getElementById('content_date_end');
+            const box = document.getElementById('content_date_range_box');
+            if (!sel || !s || !e) return;
+            const v = String(sel.value || '');
+            const pad2 = (n) => String(n).padStart(2, '0');
+            const toISO = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            try { if (box) box.style.display = (v === 'custom') ? 'flex' : 'none'; } catch (_) {}
+            if (!v) {
+                s.value = '';
+                e.value = '';
+                return;
+            }
+            if (v === 'today') {
+                s.value = toISO(today);
+                e.value = toISO(today);
+                return;
+            }
+            if (v === 'yesterday') {
+                const d = new Date(today.getTime() - 86400000);
+                s.value = toISO(d);
+                e.value = toISO(d);
+                return;
+            }
+            if (v === '7d' || v === '30d') {
+                const days = v === '7d' ? 6 : 29;
+                const start = new Date(today.getTime() - days * 86400000);
+                s.value = toISO(start);
+                e.value = toISO(today);
+                return;
+            }
+            if (v === 'custom') return;
+        }
+
+        // Init
+        try {
+            window.app = window.app || {};
+            Object.assign(window.app, { switchTab, adminLogout, adminLogin, loadUsers, loadContent, loadAITasks, setAiJobStatus, adminCancelAIJob, loadAudit, loadSystem, loadApiMonitor, applyContentDatePreset, loadAssetReleases, activateAssetRelease, loadAssetsRollout, saveAssetsRollout, runAssetsRolloutGuard, loadFeedRecallConfig, saveFeedRecallConfig, exportWorkerCallbackSamples, exportWorkerCallbackAlerts, saveWorkerCallbackThresholds, ackWorkerCallbackAlert, ackFilteredWorkerCallbackAlerts, ackTodayWorkerCallbackAlerts, adminReviewDecision, adminBanUser, adminUnbanUser, adminSetReputation, adminBulkBanUsers, adminRemovePost, adminRestorePost, adminDeletePost, adminPurgePost, adminBulkRemove, adminBulkDelete, adminBulkDeleteRemoved });
+        } catch (_) {
+        }
+        try {
+            applyCbmThresholdInputs(getCbmThresholds());
+            ['cbm_th_dup_y','cbm_th_dup_r','cbm_th_ij_y','cbm_th_ij_r','cbm_th_ip_y','cbm_th_ip_r','cbm_th_pr_y','cbm_th_pr_r'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('change', () => {
+                    try { setCbmThresholds(readCbmThresholdInputs()); } catch (_) {}
+                    if (currentTab === 'system') loadSystem();
+                });
+            });
+        } catch (_) {
+        }
+        try {
+            const el = document.getElementById('cbm_alerts_only_unacked');
+            if (el) {
+                el.addEventListener('change', () => {
+                    if (currentTab === 'system') loadSystem();
+                });
+            }
+        } catch (_) {
+        }
+        try {
+            if (!window.__aiseekAdminActionsLoaded) {
+                window.__aiseekAdminActionsLoaded = true;
+                const s = document.createElement('script');
+                s.src = '{{ asset_url("js/modules/actions.js") }}';
+                s.async = true;
+                document.head.appendChild(s);
+            }
+        } catch (_) {
+        }
+        try {
+            document.querySelectorAll('.ai-status-chip').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    try { setAiJobStatus(String(btn.getAttribute('data-status') || '')); } catch (_) {}
+                });
+            });
+            setAiJobStatus('');
+        } catch (_) {
+        }
+        try {
+            setInterval(() => {
+                if (currentTab === 'dashboard') {
+                    try { loadDashboard(); } catch (_) {}
+                }
+                if (currentTab === 'ai_tasks') {
+                    try { loadAITasks(); } catch (_) {}
+                }
+            }, 15000);
+        } catch (_) {
+        }
+        checkAuth();
+
+    </script>
+</body>
+</html>

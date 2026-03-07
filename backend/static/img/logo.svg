@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <defs>
+    <!-- 光盘渐变 -->
+    <radialGradient id="discGradient" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" style="stop-color:#fe2c55;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#c41540;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b0f2e;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- 音浪渐变 -->
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#fe2c55;stop-opacity:1" />
+      <stop offset="25%" style="stop-color:#ff6b8a;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#fe2c55;stop-opacity:1" />
+      <stop offset="75%" style="stop-color:#ff6b8a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fe2c55;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- 光盘高光 -->
+    <linearGradient id="discHighlight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.4" />
+      <stop offset="50%" style="stop-color:#ffffff;stop-opacity:0" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 光盘主体 -->
+  <circle cx="30" cy="30" r="22" fill="url(#discGradient)" stroke="#ff6b8a" stroke-width="1.5"/>
+  
+  <!-- 光盘中心孔 -->
+  <circle cx="30" cy="30" r="6" fill="#121212" stroke="#ff6b8a" stroke-width="1"/>
+  
+  <!-- 光盘高光效果 -->
+  <ellipse cx="26" cy="26" rx="8" ry="4" fill="url(#discHighlight)" transform="rotate(-45 26 26)"/>
+  
+  <!-- 光盘纹理圈 -->
+  <circle cx="30" cy="30" r="16" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.3"/>
+  <circle cx="30" cy="30" r="12" fill="none" stroke="#ffffff" stroke-width="0.5" opacity="0.2"/>
+  
+  <!-- 彩色音浪 (5 个波浪条) -->
+  <g transform="translate(65, 30)">
+    <!-- 第 1 条 -->
+    <rect x="0" y="-12" width="4" height="24" rx="2" fill="url(#waveGradient)" opacity="0.9"/>
+    <!-- 第 2 条 -->
+    <rect x="8" y="-18" width="4" height="36" rx="2" fill="url(#waveGradient)" opacity="0.85"/>
+    <!-- 第 3 条 (最高) -->
+    <rect x="16" y="-22" width="4" height="44" rx="2" fill="url(#waveGradient)" opacity="1"/>
+    <!-- 第 4 条 -->
+    <rect x="24" y="-16" width="4" height="32" rx="2" fill="url(#waveGradient)" opacity="0.85"/>
+    <!-- 第 5 条 -->
+    <rect x="32" y="-10" width="4" height="20" rx="2" fill="url(#waveGradient)" opacity="0.9"/>
+  </g>
+  
+  <!-- AIseek 文字 -->
+  <text x="115" y="38" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff">
+    AI<tspan fill="#fe2c55">seek</tspan>
+  </text>
+</svg>

@@ -1,0 +1,15 @@
+VOICE_PROFILES = {
+    "premium_female": {"voice": "zh-CN-XiaoxiaoNeural", "rate": "+0%", "pitch": "+0Hz"},
+    "premium_male": {"voice": "zh-CN-YunxiNeural", "rate": "+0%", "pitch": "+0Hz"},
+    "premium_news": {"voice": "zh-CN-YunjianNeural", "rate": "-2%", "pitch": "-1Hz"},
+    "premium_en": {"voice": "en-US-JennyNeural", "rate": "+0%", "pitch": "+0Hz"},
+    "calm": {"voice": "zh-CN-YunxiNeural", "rate": "-10%", "pitch": "-2Hz"},
+    "energetic": {"voice": "zh-CN-XiaoxiaoNeural", "rate": "+8%", "pitch": "+2Hz"},
+    "news": {"voice": "zh-CN-YunyangNeural", "rate": "-5%", "pitch": "-1Hz"},
+    "story": {"voice": "zh-CN-XiaoyiNeural", "rate": "-3%", "pitch": "+1Hz"},
+    "friendly": {"voice": "zh-CN-XiaoyiNeural", "rate": "+2%", "pitch": "+2Hz"},
+    "mature_male": {"voice": "zh-CN-YunxiNeural", "rate": "-6%", "pitch": "-2Hz"},
+    "clear_female": {"voice": "zh-CN-XiaoxiaoNeural", "rate": "+0%", "pitch": "+0Hz"},
+    "en_female": {"voice": "en-US-JennyNeural", "rate": "+0%", "pitch": "+0Hz"},
+    "en_male": {"voice": "en-US-GuyNeural", "rate": "+0%", "pitch": "+0Hz"},
+}

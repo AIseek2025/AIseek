@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="aiseek-build" content="{{ build_id }}">
+    <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml">
+    <title>AI创作工作台 - AIseek</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f1219;
+            --surface: #171b25;
+            --surface-soft: #1f2532;
+            --text: #f5f7ff;
+            --muted: rgba(245,247,255,0.68);
+            --muted2: rgba(245,247,255,0.50);
+            --stroke: rgba(255,255,255,0.16);
+            --stroke-soft: rgba(255,255,255,0.10);
+            --primary: #fe2c55;
+            --title-bg: rgba(254,44,85,0.94);
+            --r-sm: 8px;
+            --r-md: 12px;
+            --r-lg: 14px;
+            --s-1: 8px;
+            --s-2: 16px;
+            --s-3: 24px;
+            --dur-fast: 120ms;
+            --dur-base: 180ms;
+            --good: #4ade80;
+            --warn: #fbbf24;
+            --bad: #f87171;
+        }
+        body[data-theme="light"] {
+            --bg: #f3f5fa;
+            --surface: #ffffff;
+            --surface-soft: #f6f8fc;
+            --text: #141a28;
+            --muted: rgba(20,26,40,0.74);
+            --muted2: rgba(20,26,40,0.56);
+            --stroke: rgba(18,21,33,0.14);
+            --stroke-soft: rgba(18,21,33,0.08);
+            --primary: #e11d48;
+            --title-bg: rgba(225,29,72,0.90);
+        }
+        body[data-title-tone="soft"] { --title-bg: rgba(254,44,85,0.72); }
+        body[data-theme="light"][data-title-tone="soft"] { --title-bg: rgba(225,29,72,0.62); }
+        body[data-brand="vivid"] {
+            --primary: #ff375f;
+            --title-bg: rgba(255,55,95,0.94);
+        }
+        body[data-theme="light"][data-brand="vivid"] {
+            --primary: #d91645;
+            --title-bg: rgba(217,22,69,0.90);
+        }
+        body[data-density="compact"] {
+            --s-1: 6px;
+            --s-2: 12px;
+            --s-3: 18px;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background: radial-gradient(1200px 520px at 4% -12%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 62%), var(--bg); color: var(--text); }
+        a { color: inherit; text-decoration: none; }
+        .topbar { height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: color-mix(in srgb, var(--bg) 94%, #000 6%); position: sticky; top: 0; z-index: 20; border-bottom: 0; backdrop-filter: blur(8px); box-shadow: 0 8px 20px rgba(0,0,0,0.10); }
+        .topbar .row { flex-wrap: nowrap; gap: 8px; min-width: 0; }
+        .topbar .row:last-child { margin-left: auto; justify-content: flex-end; flex: 1; }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.3px; }
+        .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+        .pill { display: inline-flex; align-items: center; gap: var(--s-1); padding: 8px 11px; border-radius: 999px; background: var(--surface-soft); border: 1px solid var(--stroke); transition: all var(--dur-fast) cubic-bezier(.2,.8,.2,1); }
+        .pill:hover { background: var(--surface); }
+        .btn { display: inline-flex; align-items: center; gap: var(--s-1); border: 0; cursor: pointer; border-radius: var(--r-sm); height: 36px; padding: 0 12px; background: var(--surface-soft); color: var(--text); border: 1px solid var(--stroke); transition: all var(--dur-fast) cubic-bezier(.2,.8,.2,1); font-size: 13px; font-weight: 600; }
+        .btn:hover { background: var(--surface); transform: translateY(-1px); }
+        .btn span { white-space: nowrap; }
+        .btn-primary { background: rgba(254,44,85,0.16); border-color: rgba(254,44,85,0.44); }
+        .btn-primary:hover { background: rgba(254,44,85,0.24); }
+        .btn-danger { background: rgba(248,113,113,0.15); border-color: rgba(248,113,113,0.35); }
+        .btn-danger:hover { background: rgba(248,113,113,0.22); }
+        .btn-small { height: 32px; padding: 0 10px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; }
+        .layout { padding: var(--s-2); min-height: calc(100vh - 62px); max-width: 1800px; margin: 0 auto; }
+        .workspace-board { height: auto; overflow: visible; column-count: 3; column-gap: var(--s-2); }
+        .workspace-board::-webkit-scrollbar { width: 8px; height: 8px; }
+        .workspace-board::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 999px; }
+        .workspace-board::-webkit-scrollbar-track { background: transparent; }
+        .ws-module { width: 100%; break-inside: avoid; margin: 0 0 var(--s-2); background: color-mix(in srgb, var(--surface) 96%, transparent); border: 1px solid var(--stroke); border-radius: var(--r-lg); overflow: hidden; display: flex; flex-direction: column; min-height: 220px; box-shadow: 0 8px 18px color-mix(in srgb, #000 8%, transparent); }
+        .ws-module[data-size="wide"] { width: 100%; }
+        .ws-module.dragging { opacity: .66; transform: scale(.995); }
+        .module-h { padding: 0 12px; border-bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--s-1); background: linear-gradient(90deg, var(--title-bg), color-mix(in srgb, var(--title-bg) 84%, #000 16%)); height: 44px; min-height: 44px; }
+        .module-h .title { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.2px; color: #fff; }
+        .module-b { padding: var(--s-2); overflow: visible; min-height: 0; flex: 1; background: transparent; }
+        .module-b::-webkit-scrollbar { width: 8px; height: 8px; }
+        .module-b::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 999px; }
+        .module-b::-webkit-scrollbar-track { background: transparent; }
+        .drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--r-sm); border: 1px solid var(--stroke); background: var(--surface-soft); color: var(--muted); cursor: grab; user-select: none; }
+        .drag-handle:active { cursor: grabbing; }
+        #mod-create { min-height: max(700px, calc(100vh - 94px)); }
+        #mod-create .module-b { overflow: visible; }
+        #mod-task, #mod-preview, #mod-chat, #mod-works { min-height: 0; }
+        #mod-works .module-b { max-height: 620px; overflow: auto; }
+        #mod-chat { min-height: 320px; }
+        #mod-works { min-height: 320px; }
+        #midBody { overflow: visible; }
+        .right-events { border-top: 0; padding: 12px 0 0; background: transparent; }
+        .section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: var(--s-1); }
+        .section-head .t { font-weight: 800; font-size: 13px; letter-spacing: 0.2px; color: rgba(255,255,255,0.90); }
+        .section-tag { font-size: 11px; color: rgba(255,255,255,0.55); padding: 3px 9px; border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; background: rgba(255,255,255,0.05); }
+        .muted { color: var(--muted); }
+        .muted2 { color: var(--muted2); }
+        .hr { display: none; }
+        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .field label { font-size: 12px; color: var(--muted); }
+        .input, .select, .textarea { background: var(--surface-soft); border: 1px solid var(--stroke); color: var(--text); border-radius: var(--r-sm); padding: 10px 12px; outline: none; transition: all var(--dur-fast) ease; }
+        .input:focus, .select:focus, .textarea:focus { border-color: rgba(254,44,85,0.62); box-shadow: 0 0 0 2px rgba(254,44,85,0.18); }
+        .select { width: 100%; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .textarea { min-height: 140px; resize: vertical; }
+        .row { display: flex; gap: var(--s-1); align-items: center; flex-wrap: wrap; }
+        .grow { flex: 1; min-width: 0; }
+        .form-grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-grid-three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .inline-grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); margin-bottom: 12px; }
+        .inline-grid-three { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); margin-bottom: 12px; }
+        .inline-ctl { display: flex; align-items: center; gap: var(--s-1); }
+        .inline-ctl .name { font-size: 12px; color: var(--muted); min-width: 42px; white-space: nowrap; }
+        .inline-ctl .select { flex: 1; min-width: 0; }
+        .inline-ctl.wide .name { min-width: 44px; }
+        .inline-ctl.wide .select { min-width: 198px; }
+        .bgm-track-full { margin-top: 6px; font-size: 12px; color: var(--muted2); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+        .badge { font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--stroke); background: transparent; color: var(--muted); }
+        .badge.good { color: var(--good); border-color: rgba(74,222,128,0.35); background: rgba(74,222,128,0.10); }
+        .badge.warn { color: var(--warn); border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.10); }
+        .badge.bad { color: var(--bad); border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.10); }
+        .list { display: flex; flex-direction: column; gap: 10px; }
+        .card { background: transparent; border: 0; border-radius: var(--r-sm); padding: var(--s-2); transition: all var(--dur-base) ease; }
+        .card:hover { border-color: transparent; }
+        .card.active { border-color: rgba(254,44,85,0.55); box-shadow: 0 0 0 1px rgba(254,44,85,0.22) inset; }
+        .card-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .card-title .t { font-size: 13px; font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .card-sub { font-size: 12px; color: var(--muted2); margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .works-card-list .card-title .t { max-width: none; width: 100%; }
+        .status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); border: 1px solid var(--stroke); border-radius: 999px; height: 26px; padding: 0 10px; background: color-mix(in srgb, var(--surface-soft) 90%, transparent); }
+        .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; opacity: .9; }
+        .status-pill.good { color: var(--good); }
+        .status-pill.warn { color: var(--warn); }
+        .status-pill.bad { color: var(--bad); }
+        .tabs { display: flex; gap: var(--s-1); padding: 8px 0; border-bottom: 0; background: transparent; }
+        .tab { cursor: pointer; padding: 8px 10px; border-radius: var(--r-sm); border: 1px solid var(--stroke-soft); color: var(--muted); background: transparent; font-size: 13px; transition: all var(--dur-fast) ease; }
+        .tab:hover { border-color: var(--stroke); background: var(--surface); }
+        .tab.active { color: #fff; border-color: rgba(254,44,85,0.62); background: rgba(254,44,85,0.92); }
+        .editor { width: 100%; min-height: 240px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; font-size: 12px; line-height: 1.4; }
+        .video { width: 100%; aspect-ratio: 16/9; border-radius: 12px; background: #000; border: 1px solid rgba(255,255,255,0.14); }
+        #mod-preview .module-b { padding: 0; }
+        #mod-preview .card { padding: 0; }
+        #mod-preview .video { display: block; border: 0; border-radius: 0; width: 100%; aspect-ratio: 16/9; }
+        #mod-preview .row { padding: 10px 12px; }
+        #mod-preview #mediaList { margin: 0 12px 12px; }
+        .kv { display: grid; grid-template-columns: 92px 1fr; gap: 8px 10px; font-size: 12px; }
+        .kv .k { color: var(--muted2); }
+        .kv .v { color: rgba(255,255,255,0.86); word-break: break-all; }
+        .chat { display: flex; flex-direction: column; gap: 10px; }
+        .chat-log { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow: auto; padding-right: 4px; }
+        .msg { padding: 10px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.14); }
+        .msg.user { border-color: rgba(254,44,85,0.28); }
+        .msg.assistant { border-color: rgba(96,165,250,0.25); }
+        .msg .r { font-size: 11px; color: var(--muted2); margin-bottom: 6px; }
+        .msg .c { white-space: pre-wrap; font-size: 13px; line-height: 1.55; color: rgba(255,255,255,0.88); }
+        .chat-input { display: flex; gap: 8px; }
+        .chat-input textarea { min-height: 132px; resize: vertical; }
+        .works-card-list.compact .card { padding: 7px 8px; border-radius: var(--r-sm); }
+        .works-card-list.compact .card-sub { font-size: 11px; margin-top: 4px; }
+        .works-card-list.compact .card-title .t { font-size: 12px; max-width: 180px; }
+        body[data-theme="light"] .tab.active { color: #fff; }
+        .toast { position: fixed; right: 16px; bottom: 16px; background: rgba(0,0,0,0.72); color: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 10px 12px; max-width: 420px; display: none; z-index: 99; box-shadow: 0 16px 38px rgba(0,0,0,0.36); }
+        .toast.show { display: block; }
+        @media (max-width: 1560px) {
+            .workspace-board { column-count: 2; }
+            #mod-create { min-height: 640px; }
+        }
+        @media (max-width: 1320px) {
+            #buildTag { display: none; }
+        }
+        @media (max-width: 1200px) {
+            .layout { height: auto; min-height: 0; }
+            .workspace-board { height: auto; column-count: 1; }
+            #mod-create, #mod-task, #mod-preview, #mod-chat, #mod-works { min-height: 0; }
+            #mod-works .module-b { max-height: none; }
+            .form-grid-two, .form-grid-three { grid-template-columns: 1fr; }
+            .inline-grid-two, .inline-grid-three { grid-template-columns: 1fr; }
+            .topbar .row:last-child { flex: 1; justify-content: flex-end; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="row">
+            <a class="pill" href="/"><i class="fas fa-arrow-left"></i><span>首页</span></a>
+            <div class="brand"><span class="dot"></span><span>AI创作工作台</span></div>
+            <span class="muted2" id="buildTag">{{ build_id }}</span>
+        </div>
+        <div class="row">
+            <button class="btn btn-small" id="btnTheme"><i class="fas fa-circle-half-stroke"></i><span id="themeLabel">主题</span></button>
+            <button class="btn btn-small" id="btnTitleTone"><i class="fas fa-fill-drip"></i><span id="titleToneLabel">红阶</span></button>
+            <button class="btn btn-small" id="btnBrand"><i class="fas fa-palette"></i><span id="brandLabel">稳重</span></button>
+            <button class="btn btn-small" id="btnDensity"><i class="fas fa-arrows-up-down"></i><span id="densityLabel">舒适</span></button>
+            <button class="btn btn-small" id="btnResetLayout"><i class="fas fa-rotate-left"></i><span>重置</span></button>
+        </div>
+    </div>
+
+    <div class="layout">
+        <div class="workspace-board" id="workspaceBoard">
+            <section class="ws-module" id="mod-create" data-module="create" data-size="narrow" draggable="true">
+            <div class="module-h">
+                <div class="title">1. 新建AI视频任务</div>
+                <div class="row">
+                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
+                </div>
+            </div>
+            <div class="module-b">
+                <div id="loginBox" class="card">
+                    <div class="row" style="justify-content:space-between;">
+                        <div style="font-weight:700;">登录</div>
+                        <div class="muted2" style="font-size:12px;">账号与主站共用</div>
+                    </div>
+                    <div class="hr"></div>
+                    <div class="field">
+                        <label>用户名</label>
+                        <input class="input" id="loginUser" placeholder="admin / testuser / demo">
+                    </div>
+                    <div class="field">
+                        <label>密码</label>
+                        <input class="input" id="loginPass" type="password" placeholder="admin123 / test123 / demo123">
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-primary grow" id="btnLogin"><i class="fas fa-right-to-bracket"></i>登录</button>
+                        <button class="btn grow" id="btnQuickAdmin">Admin</button>
+                    </div>
+                </div>
+
+                <div id="createBox" class="card" style="display:none;">
+                    <div class="row" style="justify-content:flex-end;">
+                        <span class="badge" id="cooldownBadge" style="display:none;">冷却中</span>
+                    </div>
+                    <div class="field">
+                        <label>标题（可选）</label>
+                        <input class="input" id="inTitle" placeholder="例如：5分钟搞懂 RAG 与 Agent">
+                    </div>
+                    <div class="field">
+                        <label>标签（可选）</label>
+                        <input class="input" id="inTags" placeholder="多个标签用空格/逗号分隔，如 AI 创作 科普">
+                    </div>
+                    <div class="field">
+                        <label>用户文稿（将转为口播稿/脚本）</label>
+                            <textarea class="textarea" id="inContent" placeholder="粘贴你的长文稿或要点..."></textarea>
+                    </div>
+                    <div class="inline-grid-two">
+                        <div class="inline-ctl">
+                            <span class="name">分类</span>
+                            <select class="select" id="inCategory"></select>
+                        </div>
+                        <div class="inline-ctl">
+                            <span class="name">口播风格</span>
+                            <select class="select" id="inVoice">
+                                <option value="premium_female">高拟真女声（中文）</option>
+                                <option value="premium_male">高拟真男声（中文）</option>
+                                <option value="premium_news">专业播报（中文）</option>
+                                <option value="premium_en">高拟真女声（EN）</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="inline-grid-two">
+                        <div class="inline-ctl">
+                            <span class="name">BGM 氛围</span>
+                            <select class="select" id="inBgm">
+                                <option value="">默认</option>
+                                <option value="none">无BGM</option>
+                                <option value="tech">科技感</option>
+                                <option value="cheerful">轻快</option>
+                                <option value="serious">严肃</option>
+                                <option value="relaxing">舒缓</option>
+                                <option value="warm">温暖</option>
+                                <option value="cinematic">电影感</option>
+                                <option value="lofi">LoFi</option>
+                                <option value="ambient">氛围</option>
+                                <option value="piano">钢琴</option>
+                                <option value="acoustic">原声吉他</option>
+                                <option value="hiphop">嘻哈节奏</option>
+                                <option value="edm">电子/EDM</option>
+                                <option value="synthwave">合成波</option>
+                                <option value="orchestral">史诗管弦</option>
+                                <option value="corporate">商务轻快</option>
+                                <option value="jazz">爵士</option>
+                                <option value="rock">摇滚</option>
+                            </select>
+                        </div>
+                        <div class="inline-ctl">
+                            <span class="name">BGM 曲目</span>
+                            <select class="select" id="inBgmTrack">
+                                <option value="">自动</option>
+                            </select>
+                            <div class="bgm-track-full" id="bgmTrackFull" style="display:none;"></div>
+                        </div>
+                    </div>
+                    <div class="inline-grid-three">
+                        <div class="inline-ctl wide">
+                            <span class="name">字幕</span>
+                            <select class="select" id="inSubMode">
+                                <option value="zh" selected>中文（默认）</option>
+                                <option value="off">关闭</option>
+                                <option value="en">英文</option>
+                                <option value="zh-en">中英同屏</option>
+                                <option value="both">中英（分轨）</option>
+                            </select>
+                        </div>
+                        <div class="inline-ctl wide">
+                            <span class="name">封面</span>
+                            <select class="select" id="inCoverOrient">
+                                <option value="portrait">竖屏</option>
+                                <option value="landscape">横屏</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="inline-grid-two">
+                        <div class="inline-ctl">
+                            <span class="name">最长时长</span>
+                            <select class="select" id="inDurMax">
+                                <option value="">自动</option>
+                                <option value="60">1分钟</option>
+                                <option value="600">10分钟</option>
+                                <option value="1800">30分钟</option>
+                                <option value="3600">60分钟</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="field grow" style="margin:0;">
+                            <label>附加指令（可选）</label>
+                            <textarea class="textarea" id="inInstr" style="min-height:84px;" placeholder="例如：更口语化、每句不超过20字"></textarea>
+                        </div>
+                    </div>
+                    <div class="field" style="margin:8px 0 12px;">
+                        <label>语音样本（可选）</label>
+                        <div class="row">
+                            <button class="btn btn-small" id="btnUploadVoiceSample" type="button"><i class="fas fa-microphone"></i>上传语音</button>
+                            <span class="muted2" id="voiceSampleHint">未上传</span>
+                        </div>
+                    </div>
+                    <div class="field" style="margin:0 0 12px;">
+                        <label>视频样本（可选）</label>
+                        <div class="row">
+                            <button class="btn btn-small" id="btnUploadAvatarSample" type="button"><i class="fas fa-video"></i>上传视频</button>
+                            <span class="muted2" id="avatarSampleHint">未上传</span>
+                        </div>
+                    </div>
+                    <div class="row" style="margin-top:12px;">
+                        <button class="btn btn-primary grow" id="btnCreate"><i class="fas fa-wand-magic-sparkles"></i>开始生成</button>
+                    </div>
+                </div>
+            </div>
+            </section>
+
+            <section class="ws-module" id="mod-task" data-module="task" data-size="narrow" draggable="true">
+            <div class="module-h">
+                <div class="title">2. 任务进度与脚本</div>
+                <div class="row">
+                    <button class="btn btn-small" id="btnOpenInProfile"><i class="fas fa-up-right-from-square"></i>个人页</button>
+                    <button class="btn btn-small" id="btnDispatch" style="display:none;"><i class="fas fa-truck-fast"></i>重试派发</button>
+                    <button class="btn btn-small" id="btnCancel"><i class="fas fa-ban"></i>取消</button>
+                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
+                </div>
+            </div>
+            <div class="module-b">
+                <div class="row" style="justify-content:space-between; align-items:center;">
+                    <div class="tabs" style="padding:0;">
+                        <div class="tab active" data-tab="overview">概览</div>
+                        <div class="tab" data-tab="draft">脚本</div>
+                        <div class="tab" data-tab="history">回退</div>
+                    </div>
+                    <div class="row">
+                        <span class="badge" id="jobStatus">-</span>
+                        <span class="badge" id="jobProgress">0%</span>
+                    </div>
+                </div>
+                <div id="midBody" style="margin-top:10px;">
+                    <div id="tab_overview">
+                        <div class="card">
+                            <div class="row" style="justify-content:space-between;">
+                                <div style="font-weight:800;" id="jobTitle">未选择作品</div>
+                            </div>
+                            <div class="hr"></div>
+                            <div class="kv" style="margin-top:10px;">
+                                <div class="k">Job</div><div class="v" id="jobId">-</div>
+                                <div class="k">Post</div><div class="v" id="postId">-</div>
+                                <div class="k">Stage</div><div class="v" id="jobStage">-</div>
+                                <div class="k">Message</div><div class="v" id="jobMsg">-</div>
+                            </div>
+                            <div class="hr"></div>
+                            <div class="row" style="margin-top:16px;">
+                                <button class="btn btn-primary" id="btnRerun"><i class="fas fa-rotate-right"></i>按脚本重跑</button>
+                                <button class="btn" id="btnSuggest"><i class="fas fa-lightbulb"></i>AI建议脚本</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab_draft" style="display:none;">
+                        <div class="card">
+                            <div class="row" style="justify-content:space-between;">
+                                <div style="font-weight:700;">脚本编辑</div>
+                                <div class="row">
+                                    <label class="muted2" style="font-size:12px; display:flex; align-items:center; gap:8px;">
+                                        <input type="checkbox" id="toggleRaw" style="width:14px;height:14px;">编辑原始JSON
+                                    </label>
+                                    <button class="btn btn-primary btn-small" id="btnSaveDraft"><i class="fas fa-save"></i>保存</button>
+                                </div>
+                            </div>
+                            <div class="hr"></div>
+                            <textarea class="textarea editor" id="draftEditor" placeholder="这里将展示当前脚本..."></textarea>
+                            <div class="muted2" style="font-size:12px; margin-top:10px;">保存后会写入草稿版本，可在“回退”中一键恢复。</div>
+                        </div>
+                    </div>
+
+                    <div id="tab_history" style="display:none;">
+                        <div class="card">
+                            <div class="row" style="justify-content:space-between;">
+                                <div style="font-weight:700;">草稿历史</div>
+                                <button class="btn btn-small" id="btnReloadHistory"><i class="fas fa-rotate"></i>刷新</button>
+                            </div>
+                            <div class="hr"></div>
+                            <div id="historyList" class="list"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="right-events" style="margin-top:12px; border-radius:12px;">
+                    <div class="section-head">
+                        <div class="t">事件流</div>
+                        <div class="section-tag" id="evHint">-</div>
+                    </div>
+                    <div id="evLog" class="muted" style="font-size:12px; line-height:1.5; white-space:pre-wrap; max-height:210px; overflow:auto;"></div>
+                </div>
+            </div>
+            </section>
+
+            <section class="ws-module" id="mod-preview" data-module="preview" data-size="narrow" draggable="true">
+            <div class="module-h">
+                <div class="title">3. 视频预览</div>
+                <div class="row">
+                    <button class="btn btn-small" id="btnReloadPreview"><i class="fas fa-rotate"></i>刷新</button>
+                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
+                </div>
+            </div>
+            <div class="module-b">
+                <div class="card">
+                    <video id="videoEl" class="video" controls playsinline></video>
+                    <div class="hr"></div>
+                    <div class="row">
+                        <button class="btn btn-primary btn-small" id="btnPublishPost"><i class="fas fa-paper-plane"></i>发布</button>
+                        <button class="btn btn-small" id="btnListMedia"><i class="fas fa-layer-group"></i>版本</button>
+                        <button class="btn btn-small" id="btnOpenPost"><i class="fas fa-eye"></i>打开作品页</button>
+                        <button class="btn btn-small" id="btnDownloadPost"><i class="fas fa-download"></i>下载</button>
+                    </div>
+                    <div class="muted2" style="font-size:12px; padding:0 12px 12px;">生成完成后先预览，确认满意后再点击发布。</div>
+                    <div id="mediaList" class="list" style="margin-top:12px; display:none;"></div>
+                </div>
+            </div>
+            </section>
+
+            <section class="ws-module" id="mod-chat" data-module="chat" data-size="narrow" draggable="true">
+            <div class="module-h">
+                <div class="title">4. AI创作沟通</div>
+                <div class="row">
+                    <button class="btn btn-small" id="btnReloadChat"><i class="fas fa-rotate"></i>刷新</button>
+                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
+                </div>
+            </div>
+            <div class="module-b">
+                <div class="card">
+                    <div class="chat">
+                        <div id="chatLog" class="chat-log"></div>
+                        <div class="chat-input">
+                            <textarea class="textarea grow" id="chatInput" placeholder="例如：把开头更抓人；每段加一句总结；增加一个案例..."></textarea>
+                            <button class="btn btn-primary" id="btnSendChat"><i class="fas fa-paper-plane"></i>发送</button>
+                        </div>
+                        <div class="row">
+                            <button class="btn btn-small" id="btnChatSuggest"><i class="fas fa-wand-magic-sparkles"></i>对话建议</button>
+                            <button class="btn btn-small" id="btnReviseFromChat"><i class="fas fa-clone"></i>生成新版本</button>
+                        </div>
+                        <div class="muted2" style="font-size:12px;">“生成新版本”会创建新的 job 并把当前 post 绑定到新 job。</div>
+                    </div>
+                </div>
+            </div>
+            </section>
+
+            <section class="ws-module" id="mod-works" data-module="works" data-size="narrow" draggable="true">
+            <div class="module-h">
+                <div class="title" id="worksTitle">5. 我的创作（0）</div>
+                <div class="row">
+                    <button class="btn btn-small" id="btnWorksCompact">紧凑</button>
+                    <button class="btn btn-small" id="btnWorksCard">卡片</button>
+                    <button class="btn btn-small" id="btnRefreshPosts"><i class="fas fa-rotate"></i>刷新</button>
+                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
+                </div>
+            </div>
+            <div class="module-b">
+                <div class="field" style="margin-top:10px;">
+                    <label>筛选</label>
+                    <select class="select" id="postFilter">
+                        <option value="all">全部</option>
+                        <option value="queued">queued</option>
+                        <option value="processing">processing</option>
+                        <option value="preview">preview</option>
+                        <option value="done">done</option>
+                        <option value="failed">failed</option>
+                        <option value="returned">returned</option>
+                    </select>
+                </div>
+                <div class="list works-card-list" id="postList"></div>
+                <div class="row" style="margin-top:10px;">
+                    <button class="btn btn-small grow" id="btnLoadMorePosts" style="display:none;"><i class="fas fa-angles-down"></i>加载更多</button>
+                </div>
+            </div>
+            </section>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="{{ asset_url('js/app/studio.js') }}"></script>
+</body>
+</html>

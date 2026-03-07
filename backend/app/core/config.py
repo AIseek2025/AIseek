@@ -1,0 +1,260 @@
+from functools import lru_cache
+from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+
+_ENV_ROOT = Path(__file__).resolve().parents[3]
+
+class Settings(BaseSettings):
+    PROJECT_NAME: str = "AIseek Backend"
+    ENV: str = "dev"
+    
+    # Database
+    DATABASE_URL: Optional[str] = None
+    AUTO_MIGRATE: bool = True
+    
+    # Security
+    SECRET_KEY: str = "your-secret-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    
+    # Worker
+    WORKER_SECRET: str = "m3pro_worker_2026"
+    WORKER_SIGNED_CALLBACK_REQUIRED: bool = False
+    WORKER_SIG_WINDOW_SEC: int = 300
+    
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_SOCKET_TIMEOUT_SEC: float = 0.6
+    REDIS_CONNECT_TIMEOUT_SEC: float = 0.3
+    REDIS_MAX_CONNECTIONS: int = 200
+
+    HOT_COUNTERS_ENABLED: bool = False
+    HOT_COUNTERS_WRITE_MODE: str = "dual"  # dual | redis
+
+    HOT_DIRTY_FLUSH_BATCH: int = 200
+    HOT_DIRTY_FLUSH_DEBOUNCE_SEC: int = 1
+    HOT_DIRTY_SHARDS: int = 8
+    HOT_DIRTY_FLUSH_MAX_LOOPS: int = 20
+    HOT_DIRTY_FLUSH_BUDGET_MS: int = 800
+
+    HOT_SHED_ENABLED: bool = False
+    HOT_SHED_POST_WRITE_PER_SEC: int = 500
+    HOT_SHED_BURST: int = 200
+
+    WRITE_GUARD_ENABLED: bool = True
+    WRITE_GUARD_RATE_PER_MIN: int = 600
+    WRITE_GUARD_BURST: int = 120
+    IDEMPOTENCY_ENABLED: bool = True
+    IDEMPOTENCY_TTL_SEC: int = 30
+    IDEMPOTENCY_MAX_BODY_BYTES: int = 262144
+    WRITE_GUARD_MEM_MAX_KEYS: int = 20000
+
+    READINESS_STRICT: bool = False
+
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_WINDOW_SEC: int = 60
+    RATE_LIMIT_FEED_PER_MIN: int = 180
+    RATE_LIMIT_AUTH_PER_MIN: int = 30
+    RATE_LIMIT_WRITE_PER_MIN: int = 600
+    RATE_LIMIT_SEARCH_PER_MIN_ANON: int = 60
+    RATE_LIMIT_SEARCH_PER_MIN_AUTH: int = 240
+    RATE_LIMIT_IDENT_CACHE_TTL_SEC: int = 30
+
+    SEARCH_BUDGET_RATE_PER_SEC_ANON: float = 4.0
+    SEARCH_BUDGET_BURST_ANON: float = 20.0
+    SEARCH_BUDGET_RATE_PER_SEC_AUTH: float = 10.0
+    SEARCH_BUDGET_BURST_AUTH: float = 60.0
+
+    HTTP_OUTBOUND_TIMEOUT_SEC: float = 0.6
+    HTTP_OUTBOUND_RETRIES: int = 1
+    HTTP_OUTBOUND_CB_FAIL_THRESHOLD: int = 5
+    HTTP_OUTBOUND_CB_OPEN_SEC: int = 30
+
+    CANARY_OVERRIDE_ENABLED: bool = False
+
+    AUTH_WRITE_REQUIRED: bool = True
+
+    FEED_PAGE_MAX_LIMIT: int = 50
+    FEED_PENDING_MAX: int = 5
+    FEED_PREF_TTL_SEC: int = 60
+    FEED_CAND_TTL_SEC: int = 5
+    FEED_CAND_LIMIT: int = 500
+
+    FEED_RECALL_PROVIDER: str = "local"  # local | remote | auto
+    FEED_RECALL_URL: Optional[str] = None
+    FEED_RECALL_PERCENT: int = 0
+    FEED_RECALL_TIMEOUT_SEC: float = 0.35
+    FEED_RECALL_RETRIES: int = 1
+    FEED_RECALL_CB_FAIL_THRESHOLD: int = 5
+    FEED_RECALL_CB_OPEN_SEC: int = 30
+    FEED_RECALL_SIGNED_REQUIRED: bool = False
+    FEED_RECALL_SHARED_SECRET: Optional[str] = None
+    FEED_RECALL_SIG_WINDOW_SEC: int = 30
+    FEED_RECALL_SERVER_RATE_PER_MIN: int = 3000
+
+    FEED_RECALL_PREWARM_ENABLED: bool = False
+    FEED_RECALL_PREWARM_INTERVAL_SEC: int = 30
+    FEED_RECALL_PREWARM_LIMIT: int = 500
+    FEED_RECALL_PREWARM_CATS: str = "all"
+    FEED_RECALL_PREWARM_MAX_CATS_PER_TICK: int = 1
+    FEED_RECALL_PREWARM_DB_BUDGET_MS: int = 150
+
+    FEED_RECALL_KIND: str = "recent"  # recent | hot | blend
+    FEED_RECALL_HOT_WINDOW_SEC: int = 86400
+    FEED_RECALL_HOT_TTL_SEC: int = 20
+    FEED_RECALL_BLEND_HOT_LIMIT: int = 50
+    FEED_RECALL_HOT_BUCKET_SEC: int = 300
+    FEED_RECALL_HOT_W_LIKE: float = 1.0
+    FEED_RECALL_HOT_W_FAVORITE: float = 3.0
+    FEED_RECALL_HOT_DECAY_ENABLED: bool = False
+    FEED_RECALL_HOT_DECAY_HALF_LIFE_SEC: int = 900
+    FEED_RECALL_HOT_W_COMMENT: float = 2.0
+    FEED_RECALL_HOT_W_REPOST: float = 4.0
+    FEED_RECALL_HOT_W_VIEW: float = 0.05
+    FEED_RECALL_HOT_VIEW_DEDUPE_SEC: int = 30
+    FEED_RECALL_HOT_REPOST_DEDUPE_SEC: int = 60
+
+    FEED_RECALL_VIEW_PCT_FULL: float = 0.9
+    FEED_RECALL_VIEW_PCT_HALF: float = 0.5
+    FEED_RECALL_VIEW_SEC_SHORT: float = 1.5
+    FEED_RECALL_VIEW_SEC_MID: float = 5.0
+    FEED_RECALL_VIEW_POINTS_FULL: float = 1.0
+    FEED_RECALL_VIEW_POINTS_HALF: float = 0.6
+    FEED_RECALL_VIEW_POINTS_MID: float = 0.3
+    FEED_RECALL_VIEW_POINTS_SHORT: float = 0.1
+
+    AI_CREATE_RATE_PER_MIN: int = 20
+    AI_CREATE_BURST: int = 10
+    AI_SUGGEST_RATE_PER_MIN: int = 6
+    AI_SUGGEST_BURST: int = 3
+    AI_REVISE_RATE_PER_MIN: int = 3
+    AI_REVISE_BURST: int = 2
+    AI_REVIEW_ENABLED: bool = False
+
+    DISPATCH_RETRY_ENABLED: bool = True
+    DISPATCH_RETRY_BASE_SEC: int = 5
+    DISPATCH_RETRY_MAX_SEC: int = 120
+    DISPATCH_RETRY_MAX_ATTEMPTS: int = 8
+    DISPATCH_RETRY_BATCH: int = 50
+    DISPATCH_SHARDS: int = 1
+    DISPATCH_SHARD_ID: int = -1
+
+    # Celery
+    CELERY_BROKER_URL: Optional[str] = None
+    CELERY_RESULT_BACKEND: Optional[str] = None
+
+    CLIENT_EVENT_STREAM_ENABLED: bool = True
+    CLIENT_EVENT_STREAM_KEY: str = "events:client"
+    CLIENT_EVENT_STREAM_GROUP: str = "client_events"
+    CLIENT_EVENT_STREAM_MAXLEN: int = 200000
+    CLIENT_EVENT_STREAM_SHARD_ENABLED: bool = True
+    CLIENT_EVENT_STREAM_TOPICS: str = "feed,player,search,other"
+    CLIENT_EVENT_MAX_DATA_BYTES: int = 8192
+    PERSONA_REBUILD_DEBOUNCE_SEC: int = 600
+    CLIENT_EVENT_LOG_ENABLED: bool = True
+    CLIENT_EVENT_DB_FALLBACK_ENABLED: bool = True
+    CLIENT_EVENT_APPLY_HOT_ENABLED: bool = False
+    CLIENT_EVENT_PERSIST_ENABLED: bool = True
+    CLIENT_EVENT_PERSIST_STRICT: bool = True
+    CLIENT_EVENT_PERSIST_SAMPLE_RATE: float = 1.0
+    CLIENT_EVENT_INGEST_SAMPLE_RATE: float = 1.0
+    CLIENT_EVENT_DROP_UNKNOWN_HEADS: bool = True
+    CLIENT_EVENT_RATE_LIMIT_ENABLED: bool = True
+    CLIENT_EVENT_RATE_LIMIT_IP_RPM: int = 600
+    CLIENT_EVENT_RATE_LIMIT_SESSION_RPM: int = 1200
+    CLIENT_EVENT_SIGNED_REQUIRED: bool = False
+    CLIENT_EVENT_SHARED_SECRET: Optional[str] = None
+    CLIENT_EVENT_SIG_WINDOW_SEC: int = 30
+    CLIENT_EVENT_TOKEN_TTL_SEC: int = 600
+    CLIENT_EVENT_TOKEN_RATE_LIMIT_ENABLED: bool = True
+    CLIENT_EVENT_TOKEN_RATE_LIMIT_IP_RPM: int = 300
+    CLIENT_EVENT_TOKEN_RATE_LIMIT_SID_RPM: int = 600
+
+    CLIENT_EVENT_AUTOGUARD_ENABLED: bool = False
+    CLIENT_EVENT_AUTOGUARD_INTERVAL_SEC: int = 5
+    CLIENT_EVENT_AUTOGUARD_BACKLOG_HIGH: int = 20000
+    CLIENT_EVENT_AUTOGUARD_BACKLOG_LOW: int = 5000
+    CLIENT_EVENT_AUTOGUARD_DEGRADE_SAMPLE_RATE: float = 0.2
+    CLIENT_EVENT_AUTOGUARD_DISABLE_PERSIST: bool = True
+    CLIENT_EVENT_AUTOGUARD_RECOVER_SAMPLE_RATE: float = 1.0
+    CLIENT_EVENT_AUTOGUARD_RECOVER_PERSIST: bool = True
+    CLIENT_EVENT_AUTOGUARD_RECOVER_STREAK: int = 6
+
+    SEARCH_HOT_ENABLED: bool = True
+    SEARCH_HOT_WINDOW_SEC: int = 3600
+    SEARCH_HOT_BUCKET_SEC: int = 60
+    SEARCH_HOT_DEDUPE_SEC: int = 10
+    SEARCH_HOT_TOP_CACHE_TTL_SEC: int = 12
+    SEARCH_HOT_TOP_CACHE_LOCK_TTL_SEC: int = 2
+    SEARCH_HOT_SCAN_BUCKETS_MAX: int = 24
+
+    ENGAGEMENT_COUNTERS_ENABLED: bool = True
+    ENGAGEMENT_COUNTERS_TTL_SEC: int = 604800
+    ENGAGEMENT_DEDUPE_IMPRESSION_SEC: int = 300
+    ENGAGEMENT_DEDUPE_CLICK_SEC: int = 60
+
+    SEARCH_RERANK_ENABLED: bool = True
+    SEARCH_RERANK_GROUP_SIZE: int = 5
+    SEARCH_RERANK_CURSOR_ENABLED: bool = False
+    SEARCH_POSTS_CACHE_TTL_SEC: int = 8
+    SEARCH_POSTS_CURSOR_CACHE_TTL_SEC: int = 4
+    SEARCH_POSTS_CACHE_LOCK_TTL_SEC: int = 2
+    SEARCH_POSTS_CURSOR_CACHE_LOCK_TTL_SEC: int = 1
+    SEARCH_POSTS_CACHE_KEY_QUERY_MAX_LEN: int = 64
+    SEARCH_USERS_CACHE_TTL_SEC: int = 8
+    SEARCH_USERS_CURSOR_CACHE_TTL_SEC: int = 4
+    SEARCH_USERS_CACHE_LOCK_TTL_SEC: int = 2
+    SEARCH_USERS_CURSOR_CACHE_LOCK_TTL_SEC: int = 1
+    SEARCH_USERS_EXACT_CACHE_TTL_SEC: int = 15
+    SEARCH_USERS_EXACT_CACHE_LOCK_TTL_SEC: int = 2
+    SEARCH_USERS_ITEMS_CACHE_TTL_SEC: int = 8
+    SEARCH_USERS_CURSOR_ITEMS_CACHE_TTL_SEC: int = 4
+    SEARCH_USERS_FUZZY_MIN_QUERY_LEN: int = 1
+    SEARCH_USERS_CACHE_KEY_QUERY_MAX_LEN: int = 64
+
+    FEED_RERANK_ENABLED: bool = True
+    FEED_RERANK_EXPOSURE_SMOOTHING: int = 200
+    FEED_RERANK_SNAPSHOT_SEC: int = 5
+    FEED_RERANK_SNAPSHOT_TTL_SEC: int = 90
+
+    FEED_DIVERSITY_ENABLED: bool = True
+    FEED_DIVERSITY_MAX_PER_AUTHOR: int = 2
+
+    # Elasticsearch
+    ELASTICSEARCH_URL: Optional[str] = None
+    ELASTICSEARCH_INDEX: str = "aiseek_posts"
+    ES_INDEX_SHARDS: int = 3
+    ES_INDEX_REPLICAS: int = 1
+    ES_BULK_CHUNK_SIZE: int = 500
+    ES_ALIAS_KEEP_INDICES: int = 3
+    ES_COOLDOWN_SEC: int = 10
+    ES_BULK_THROTTLE_MS: int = 0
+    ES_REQUEST_TIMEOUT_SEC: float = 1.6
+    ES_MAX_RETRIES: int = 1
+    ES_RETRY_ON_TIMEOUT: bool = True
+    ES_DOWN_CHECK_INTERVAL_MS: int = 250
+    ES_CLIENT_POOL_MAX: int = 32
+    ES_CLIENT_TTL_SEC: int = 1800
+    ES_CLIENT_SWEEP_INTERVAL_MS: int = 1000
+    
+    # Storage (R2/S3)
+    R2_ENDPOINT_URL: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_BUCKET_NAME: str = "aiseek-media"
+    R2_PUBLIC_URL: str = "https://cdn.aiseek.com"
+
+    model_config = SettingsConfigDict(
+        case_sensitive=True,
+        env_file=(str(_ENV_ROOT / ".env"), str(_ENV_ROOT / ".env.local")),
+        extra="ignore"
+    )
+
+settings = Settings()
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

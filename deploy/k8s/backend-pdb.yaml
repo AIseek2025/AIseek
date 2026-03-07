@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: aiseek-backend
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: aiseek-backend

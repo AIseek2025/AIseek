@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiseek-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: aiseek-backend
+  template:
+    metadata:
+      labels:
+        app: aiseek-backend
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: backend
+          image: aiseek-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: aiseek-backend-config
+            - secretRef:
+                name: aiseek-backend-secrets
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "768Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2048Mi"
+          command: ["gunicorn"]
+          args:
+            - "app.main:app"
+            - "-k"
+            - "uvicorn.workers.UvicornWorker"
+            - "-w"
+            - "4"
+            - "-b"
+            - "0.0.0.0:5000"
+            - "--timeout"
+            - "45"
+            - "--graceful-timeout"
+            - "15"
+            - "--keep-alive"
+            - "5"

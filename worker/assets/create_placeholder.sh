@@ -1,0 +1,2 @@
+#!/bin/bash
+ffmpeg -y -f lavfi -i "cellauto=size=1080x1920:rate=30:rule=110:seed=2" -f lavfi -i "cellauto=size=1080x1920:rate=30:rule=30:seed=3" -filter_complex "[0:v]format=gray,gblur=sigma=1.2:steps=2[a];[1:v]format=gray,gblur=sigma=1.2:steps=2[b];[a][b]blend=all_mode=screen:all_opacity=0.75,colorize=hue=210:saturation=0.90:lightness=0.25:mix=0.85,eq=contrast=1.08:brightness=-0.08:saturation=1.05,format=yuv420p,setsar=1[vout]" -map "[vout]" -t 20 -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p -movflags +faststart bg_placeholder.mp4
