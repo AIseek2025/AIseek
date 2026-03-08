@@ -45,8 +45,10 @@ def main():
                 os.getenv("BACKUP_S3_PREFIX", "aiseek-backups"),
                 "--endpoint_url",
                 os.getenv("BACKUP_S3_ENDPOINT_URL", ""),
-                "--region",
-                os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "")),
+                "--access_key_id",
+                os.getenv("AWS_ACCESS_KEY_ID", ""),
+                "--access_key_secret",
+                os.getenv("AWS_SECRET_ACCESS_KEY", ""),
                 "--keep_last_n",
                 str(args.keep_remote),
             ]
