@@ -53,8 +53,12 @@ def _s3_client(endpoint_url: str, region: str):
     if region:
         extra["region_name"] = region
     # 使用虚拟主机样式访问（阿里云 OSS 要求）
+    # 禁用 aws-chunked 编码（阿里云 OSS 不支持）
     extra["config"] = botocore.config.Config(
-        s3={"addressing_style": "virtual"}
+        s3={
+            "addressing_style": "virtual",
+            "payload_signing_enabled": False
+        }
     )
     return boto3.client("s3", **extra)
 
