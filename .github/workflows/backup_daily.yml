@@ -16,7 +16,7 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install boto3
+          pip install oss2
       - name: Run backup and upload
         env:
           BACKUP_NAME: AIseek-Trae-v1
@@ -28,6 +28,5 @@ jobs:
           BACKUP_S3_ENDPOINT_URL: ${{ secrets.BACKUP_S3_ENDPOINT_URL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           BACKUP_REQUIRE_REMOTE=1 python tools/backup_daily.py
