@@ -44,6 +44,7 @@ def _build_sidecars(archive: Path) -> List[Path]:
 def _s3_client(endpoint_url: str, region: str):
     try:
         import boto3
+        import botocore.config
     except Exception as e:
         raise SystemExit(f"boto3_missing: {e}")
     extra: Dict[str, str] = {}
@@ -51,6 +52,10 @@ def _s3_client(endpoint_url: str, region: str):
         extra["endpoint_url"] = endpoint_url
     if region:
         extra["region_name"] = region
+    # 使用虚拟主机样式访问（阿里云 OSS 要求）
+    extra["config"] = botocore.config.Config(
+        s3={"addressing_style": "virtual"}
+    )
     return boto3.client("s3", **extra)
 
 
