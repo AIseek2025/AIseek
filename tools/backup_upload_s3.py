@@ -52,13 +52,14 @@ def _s3_client(endpoint_url: str, region: str):
         extra["endpoint_url"] = endpoint_url
     if region:
         extra["region_name"] = region
-    # 使用虚拟主机样式访问（阿里云 OSS 要求）
-    # 禁用 aws-chunked 编码（阿里云 OSS 不支持）
+    # 阿里云 OSS 兼容配置
     extra["config"] = botocore.config.Config(
         s3={
-            "addressing_style": "virtual",
-            "payload_signing_enabled": False
-        }
+            "addressing_style": "path",  # 使用路径样式（某些 OSS 版本要求）
+            "payload_signing_enabled": False,  # 禁用 payload 签名
+            "use_accelerate_endpoint": False  # 禁用 S3 Transfer Acceleration
+        },
+        retries={"max_attempts": 3, "mode": "standard"}
     )
     return boto3.client("s3", **extra)
 
