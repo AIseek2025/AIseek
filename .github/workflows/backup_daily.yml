@@ -30,3 +30,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           BACKUP_REQUIRE_REMOTE=1 python tools/backup_daily.py
+      
+      - name: Verify backup upload
+        if: always()
+        env:
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_PREFIX: ${{ secrets.BACKUP_S3_PREFIX }}
+          BACKUP_S3_ENDPOINT_URL: ${{ secrets.BACKUP_S3_ENDPOINT_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          python tools/backup_verify.py
