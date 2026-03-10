@@ -881,6 +881,10 @@
       } else {
         if (ve.src !== src) ve.src = src;
       }
+      
+      // Ensure controls are enabled for CC button
+      ve.controls = true;
+      ve.crossOrigin = "anonymous";
     } else {
       try { ve.removeAttribute("src"); ve.load(); } catch (_) {}
     }
