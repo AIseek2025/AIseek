@@ -27,9 +27,39 @@ jobs:
       - name: Initialize database
         run: |
           python backend/init_db.py
-      - name: Smoke tests
+      - name: Smoke tests (with debug logging)
         run: |
-          python backend/scripts/ci_smoke.py http://127.0.0.1:5002 2>&1 | tee smoke.log
+          echo "=== Starting Smoke Tests ==="
+          echo "Python version: $(python --version)"
+          echo "Working directory: $(pwd)"
+          echo "Database file: $(ls -la sql_app.db 2>&1 || echo 'Not found')"
+          echo ""
+          echo "=== Running Smoke Test ==="
+          python backend/scripts/ci_smoke.py http://127.0.0.1:5002 2>&1 | tee smoke_test.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo ""
+          echo "=== Smoke Test Exit Code: $EXIT_CODE ==="
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "Smoke test failed! Check logs above."
+            echo "Common exit codes:"
+            echo "  2 = /livez health check timeout (server didn't start)"
+            echo "  3 = /readyz check failed"
+            echo "  4 = /metrics endpoint failed"
+            echo "  6 = interaction_smoke_test.py failed"
+            echo "  7 = callback_smoke_test.py failed"
+            echo "  8 = worker_callback_alert_smoke_test.py failed"
+            echo "  9 = e2e_ui_smoke.py (Playwright) failed"
+          fi
+          exit $EXIT_CODE
+        continue-on-error: true
+
+      - name: Upload smoke test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-logs
+          path: smoke_test.log
+          retention-days: 7 2>&1 | tee smoke.log
         continue-on-error: true
       
       - name: Upload smoke log
