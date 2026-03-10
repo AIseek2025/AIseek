@@ -2150,6 +2150,13 @@
             height: 64px;
         }
 
+        .upload-btn-theme {
+            background: rgba(254,44,85,0.92) !important;
+            border: 1px solid rgba(254,44,85,0.72) !important;
+            color: white !important;
+            text-decoration: none !important;
+        }
+
     </style>
 </head>
 <body data-aiseek-build="{{ build_id }}">
@@ -2230,10 +2237,10 @@
         </div>
         
         <div class="nav-right">
-            <a id="btn_ai_create" class="upload-btn" href="/studio" style="background: rgba(254,44,85,0.92); border: 1px solid rgba(254,44,85,0.72); color:white; text-decoration:none;">
+            <a id="btn_ai_create" class="upload-btn upload-btn-theme" href="/studio">
                 +AI创作
             </a>
-            <button id="btn_manual_create" class="upload-btn" style="background: rgba(254,44,85,0.92); border: 1px solid rgba(254,44,85,0.72); color:white;" data-action="call" data-fn="switchPage" data-args='["creator"]'>
+            <button id="btn_manual_create" class="upload-btn upload-btn-theme" data-action="call" data-fn="switchPage" data-args='["creator"]'>
                 +人工创作
             </button>
             
