@@ -123,7 +123,11 @@ Object.assign(window.app, {
                 const err = await res.json();
                 alert('登录失败: ' + (err.detail || '用户名或密码错误'));
             }
-        } catch(e) { console.error(e); alert('登录请求错误'); }
+        } catch(e) { 
+            if (e.name === 'AbortError') return;
+            console.error(e); 
+            alert('登录请求错误: ' + (e.message || '网络异常')); 
+        }
         finally { btn.innerText = '登录'; btn.disabled = false; }
     },
 
@@ -177,7 +181,11 @@ Object.assign(window.app, {
                 const err = await res.json();
                 alert('注册失败: ' + (err.detail || '用户名可能已存在'));
             }
-        } catch(e) { console.error(e); alert('注册请求错误'); }
+        } catch(e) { 
+            if (e.name === 'AbortError') return;
+            console.error(e); 
+            alert('注册请求错误: ' + (e.message || '网络异常')); 
+        }
         finally { btn.innerText = '立即注册'; btn.disabled = false; }
     },
 
