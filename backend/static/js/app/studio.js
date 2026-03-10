@@ -554,6 +554,11 @@
     if (job.status === "queued" || job.status === "processing") {
       attachEvents(jobId);
     } else {
+      // If job is already done, refresh post status to enable publish button
+      if (job.status === "done") {
+        setTimeout(() => loadPostAndJob(), 500);
+      }
+
       if (current.evSource && String(current.evJobId || "") === String(jobId || "")) {
         try { current.evSource.close(); } catch (_) {}
         current.evSource = null;
@@ -616,6 +621,14 @@
         setBadge($("jobProgress"), `${Number(data.progress || 0) || 0}%`, cls);
         $("jobStage").textContent = data.stage ? String(data.stage) : "-";
         $("jobMsg").textContent = data.stage_message ? String(data.stage_message) : "-";
+        
+        // Auto-refresh post status when job is done to enable publish button
+        if (st === "done") {
+          // Add a small delay to ensure backend state is consistent
+          setTimeout(() => {
+             loadPostAndJob();
+          }, 1000);
+        }
       }
     } catch (_) {}
     const msg = data !== undefined ? JSON.stringify(data) : "";
