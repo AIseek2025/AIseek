@@ -29,21 +29,36 @@ git push origin main
 echo -e "${GREEN}✅ 代码已推送${NC}"
 echo ""
 
-# 2. 服务器更新
-echo -e "${YELLOW}[2/3] 服务器更新代码并重启服务...${NC}"
+# 2. 创建发布包并上传
+echo -e "${YELLOW}[2/3] 创建发布包并上传到服务器...${NC}"
+cd /tmp
+tar --exclude='__pycache__' --exclude='*.pyc' --exclude='*.log' --exclude='.git' \
+    --exclude='backend/static' --exclude='backend/venv' --exclude='backend/logs' \
+    -czf aiseek-deploy-$(date +%Y%m%d_%H%M%S).tgz \
+    backend/app backend/alembic backend/templates backend/*.py backend/Dockerfile backend/requirements*.txt \
+    worker/app worker/*.py worker/requirements*.txt \
+    deploy docker-compose.yml
+LATEST_PKG=$(ls -t aiseek-deploy-*.tgz | head -1)
+scp "$LATEST_PKG" aliyun:/root/ 2>&1 | grep -v "Warning:"
+echo -e "${GREEN}✅ 发布包已上传${NC}"
+echo ""
+
+# 3. 服务器解压并重启
+echo -e "${YELLOW}[3/3] 服务器解压并发布包并重启服务...${NC}"
 ssh aliyun "
-    cd /root/AIseek-Trae-v1
-    git pull origin main
-    cd deploy/aliyun
+    cd /root
+    LATEST_PKG=\$(ls -t aiseek-deploy-*.tgz | head -1)
+    tar -xzf \$LATEST_PKG -C AIseek-Trae-v1/
+    cd AIseek-Trae-v1/deploy/aliyun
     docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build backend nginx
     sleep 5
     docker ps --filter 'name=aliyun' --format '{{.Names}}: {{.Status}}'
-"
+" 2>&1 | grep -v "Warning:"
 echo -e "${GREEN}✅ 服务已重启${NC}"
 echo ""
 
-# 3. 健康检查
-echo -e "${YELLOW}[3/3] 健康检查...${NC}"
+# 4. 健康检查
+echo -e "${YELLOW}[4/4] 健康检查...${NC}"
 HTTP_CODE=$(ssh aliyun "curl -s -o /dev/null -w '%{http_code}' http://localhost/")
 if [ "$HTTP_CODE" = "200" ]; then
     echo -e "${GREEN}✅ HTTP 访问正常 (状态码：${HTTP_CODE})${NC}"

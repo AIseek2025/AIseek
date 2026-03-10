@@ -36,14 +36,31 @@ git push origin main
 echo -e "${GREEN}✅ 代码已推送到 GitHub${NC}"
 echo ""
 
-# 步骤 3: SSH 登录服务器拉取代码
-echo -e "${YELLOW}[3/6] 服务器拉取最新代码...${NC}"
-ssh aliyun "cd /root/AIseek-Trae-v1 && git pull origin main && echo '✅ 代码已更新'"
+# 步骤 3: 创建发布包并上传
+echo -e "${YELLOW}[3/6] 创建发布包并上传到服务器...${NC}"
+cd /tmp
+tar --exclude='__pycache__' --exclude='*.pyc' --exclude='*.log' --exclude='.git' \
+    --exclude='backend/static' --exclude='backend/venv' --exclude='backend/logs' \
+    -czf aiseek-deploy-$(date +%Y%m%d_%H%M%S).tgz \
+    backend/app backend/alembic backend/templates backend/*.py backend/Dockerfile backend/requirements*.txt \
+    worker/app worker/*.py worker/requirements*.txt \
+    deploy docker-compose.yml
+LATEST_PKG=$(ls -t aiseek-deploy-*.tgz | head -1)
+scp "$LATEST_PKG" aliyun:/root/
+echo -e "${GREEN}✅ 发布包已上传：${LATEST_PKG}${NC}"
 echo ""
 
-# 步骤 4: 重启服务
-echo -e "${YELLOW}[4/6] 重启 Backend 和 Nginx 服务...${NC}"
-ssh aliyun "cd /root/AIseek-Trae-v1/deploy/aliyun && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build backend nginx"
+# 步骤 4: 服务器解压并重启服务
+echo -e "${YELLOW}[4/6] 服务器解压发布包并重启服务...${NC}"
+ssh aliyun "
+    cd /root
+    LATEST_PKG=\$(ls -t aiseek-deploy-*.tgz | head -1)
+    echo \"解压发布包：\$LATEST_PKG\"
+    tar -xzf \$LATEST_PKG -C AIseek-Trae-v1/
+    cd AIseek-Trae-v1/deploy/aliyun
+    docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build backend nginx
+    echo '✅ 服务已重启'
+"
 echo -e "${GREEN}✅ 服务已重启${NC}"
 echo ""
 
