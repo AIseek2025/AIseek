@@ -20,11 +20,25 @@ jobs:
         key: ${{ secrets.ALIYUN_SSH_KEY }}
         port: 22
         script: |
-          # 进入项目部署目录 (请根据实际路径修改)
-          cd /root/AIseek-Trae-v1/deploy/aliyun
+          # 定义项目路径
+          PROJECT_DIR="/root/AIseek-Trae-v1"
           
-          # 赋予脚本执行权限
+          # 1. 检查目录是否存在，不存在则克隆
+          if [ ! -d "$PROJECT_DIR" ]; then
+            echo "Project directory not found. Cloning from GitHub..."
+            git clone https://github.com/AIseek2025/AIseek.git "$PROJECT_DIR"
+          fi
+          
+          # 2. 进入项目目录并更新代码
+          cd "$PROJECT_DIR"
+          echo "Updating code..."
+          git fetch origin
+          git reset --hard origin/main
+          
+          # 3. 进入部署脚本目录
+          cd deploy/aliyun
+          
+          # 4. 赋予脚本执行权限并执行
           chmod +x update.sh
-          
-          # 执行更新脚本
+          echo "Running update script..."
           ./update.sh
