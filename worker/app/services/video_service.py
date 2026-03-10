@@ -665,6 +665,7 @@ class VideoService:
 
         master = base / "master.m3u8"
 
+        # HLS Packaging: Force SAR 1:1 for each stream to fix stretching on some players
         cmd = [
             "ffmpeg",
             "-y",
@@ -672,9 +673,9 @@ class VideoService:
             str(input_path),
             "-filter_complex",
             "[0:v]split=3[v0][v1][v2];"
-            "[v0]scale=w=-2:h=360:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p[v0o];"
-            "[v1]scale=w=-2:h=540:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p[v1o];"
-            "[v2]scale=w=-2:h=720:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p[v2o]",
+            "[v0]scale=w=-2:h=360:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p,setsar=1[v0o];"
+            "[v1]scale=w=-2:h=540:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p,setsar=1[v1o];"
+            "[v2]scale=w=-2:h=720:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p,setsar=1[v2o]",
             "-map",
             "[v0o]",
             "-map",
