@@ -665,6 +665,13 @@ def create_app() -> FastAPI:
         # 1. Try running migrations
         try:
             from app.core.migrations import run_migrations
+            import os
+            
+            # Temporary workaround for null bytes in env vars
+            for k, v in os.environ.items():
+                if '\x00' in v:
+                    os.environ[k] = v.replace('\x00', '')
+                    
             run_migrations()
             result["details"].append("Migration command executed successfully")
         except Exception as e:

@@ -48,7 +48,13 @@ def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section)
     if configuration is None:
         configuration = {}
-    configuration["sqlalchemy.url"] = get_url()
+    
+    url = get_url()
+    # Ensure URL is clean of null bytes
+    if url:
+        url = url.replace('\x00', '')
+    
+    configuration["sqlalchemy.url"] = url
 
     connectable = engine_from_config(
         configuration,
@@ -60,7 +66,8 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            compare_type=True,
+            compare_type=True, # Allow detecting type changes
+            compare_server_default=True, # Allow detecting default value changes
         )
 
         with context.begin_transaction():
