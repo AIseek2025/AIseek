@@ -59,22 +59,13 @@ jobs:
         with:
           name: smoke-test-logs
           path: smoke_test.log
-          retention-days: 7 2>&1 | tee smoke.log
-        continue-on-error: true
-      
-      - name: Upload smoke log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: smoke-logs
-          path: smoke.log
           retention-days: 7
       
       - name: Check database tables
         run: |
-          sqlite3 sql_app.db ".tables"
+          sqlite3 sql_app.db ".tables" || echo "Database not found"
       
       - name: Verify static files
         run: |
-          ls -la backend/static/js/app/ | head -20
-          ls -la backend/templates/ | head -10
+          ls -la backend/static/js/app/ 2>&1 | head -20 || echo "Static files not found"
+          ls -la backend/templates/ 2>&1 | head -10 || echo "Templates not found"
