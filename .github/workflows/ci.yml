@@ -26,7 +26,9 @@ jobs:
           python backend/scripts/check_no_raw_fetch.py
       - name: Initialize database
         run: |
-          python backend/init_db.py
+          cd backend
+          python init_db.py
+          python -c "from app.db.session import engine; from app.models.all_models import Base; Base.metadata.create_all(bind=engine)"
       - name: Smoke tests
         run: |
           python backend/scripts/ci_smoke.py http://127.0.0.1:5002
