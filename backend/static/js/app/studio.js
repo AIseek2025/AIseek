@@ -849,14 +849,38 @@
     const hls = post.video_url ? String(post.video_url) : "";
     const cover = post.cover_url ? String(post.cover_url) : `${API}/media/post-thumb/${pid}?v=${Date.now()}`;
     const tracks = post.subtitle_tracks && Array.isArray(post.subtitle_tracks) ? post.subtitle_tracks : [];
-    const src = mp4 || (hls.endsWith(".m3u8") ? "" : hls) || "";
+    
+    // Allow HLS or MP4
+    const src = hls || mp4 || "";
     const ve = $("videoEl");
     if (cover) {
       try { ve.poster = cover; } catch (_) {}
     }
     applySubtitleTracks(tracks);
+    
     if (src) {
-      if (ve.src !== src) ve.src = src;
+      // Clean up previous HLS instance if exists
+      if (current.hls) {
+        try { current.hls.destroy(); } catch(_) {}
+        current.hls = null;
+      }
+
+      if (src.endsWith(".m3u8")) {
+        if (window.Hls && Hls.isSupported()) {
+          const hlsObj = new Hls();
+          hlsObj.loadSource(src);
+          hlsObj.attachMedia(ve);
+          current.hls = hlsObj;
+        } else if (ve.canPlayType('application/vnd.apple.mpegurl')) {
+          // Native support (Safari)
+          ve.src = src;
+        } else {
+          // Fallback
+          ve.src = src;
+        }
+      } else {
+        if (ve.src !== src) ve.src = src;
+      }
     } else {
       try { ve.removeAttribute("src"); ve.load(); } catch (_) {}
     }

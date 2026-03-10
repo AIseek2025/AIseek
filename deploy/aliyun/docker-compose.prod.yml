@@ -34,6 +34,12 @@ services:
       dockerfile: Dockerfile
     restart: always
     command: gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w ${WEB_CONCURRENCY:-4} -b 0.0.0.0:5000 --timeout 60 --graceful-timeout 20 --keep-alive 5
+    ports:
+      - "5001:5000"
+    volumes:
+      - ../../backend/static:/app/static
+      - ../../backend/static:/app/backend/static
+      - ../../backend/templates:/app/templates
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       READ_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
@@ -44,6 +50,7 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      FFMPEG_HW_ACCEL: ${FFMPEG_HW_ACCEL:-libx264}
       R2_ENDPOINT_URL: ${R2_ENDPOINT_URL:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
@@ -61,19 +68,26 @@ services:
       dockerfile: Dockerfile
     restart: always
     environment:
-      WEB_URL: ${WEB_URL:?set WEB_URL}
-      CALLBACK_URL: ${CALLBACK_URL:?set CALLBACK_URL}
+      WEB_URL: http://backend:5000
+      CALLBACK_URL: http://backend:5000
       WORKER_SECRET: ${WORKER_SECRET:?set WORKER_SECRET}
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      FFMPEG_HW_ACCEL: ${FFMPEG_HW_ACCEL:-libx264}
       R2_ENDPOINT_URL: ${R2_ENDPOINT_URL:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+    volumes:
+      - ../../worker/app:/app/app
+      - ../../worker/data:/app/data
+      - ../../worker/outputs:/app/outputs
+      - ../../worker/assets:/app/assets
+      - ../../backend/static:/app/backend/static
     command: celery -A app.worker.celery_app worker -Q ai --loglevel=info --concurrency=${WORKER_CONCURRENCY:-4} --prefetch-multiplier=1 --max-tasks-per-child=50
     depends_on:
       redis:
