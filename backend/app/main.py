@@ -307,26 +307,36 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def _startup() -> None:
         # Run database migrations
-        # run_migrations()  # DISABLED FOR EMERGENCY FIX
-        # DISABLED: All DB initialization disabled for emergency fix
-        # try:
-        #     db = SessionLocal()
-        #     try:
-        #         n = db.query(Category).count()
-        #     except Exception:
-        #         n = 0
-        #     if not n:
-        #         cats = [...]
-        #         for i, c in enumerate(cats):
-        #             db.add(Category(name=c, sort_order=i, is_active=True))
-        #         db.commit()
-        #     ... (rest of DB init disabled)
-        # finally:
-        #     try:
-        #         db.close()
-        #     except Exception:
-        #         pass
-        pass  # Emergency fix: skip all DB initialization
+        try:
+            run_migrations()
+        except Exception as e:
+            print(f"Migration failed: {e}")
+        
+        # Initialize default data if needed
+        try:
+            db = SessionLocal()
+            try:
+                # Check if categories exist
+                try:
+                    n = db.query(Category).count()
+                except Exception:
+                    n = 0
+                
+                if not n:
+                    # Initialize default categories
+                    cats = [
+                        "AI", "Programming", "Ecommerce", "Marketing", "Multimodal", "Robots", 
+                        "Startup", "Design", "Product", "Engineering", "Data", "Security"
+                    ]
+                    for i, c in enumerate(cats):
+                        exists = db.query(Category).filter(Category.name == c).first()
+                        if not exists:
+                            db.add(Category(name=c, sort_order=i, is_active=True))
+                    db.commit()
+            finally:
+                db.close()
+        except Exception:
+            pass
 
     @app.on_event("startup")
     async def _startup_dispatch_retry() -> None:
