@@ -658,6 +658,51 @@ def create_app() -> FastAPI:
         #     raise HTTPException(status_code=503, detail=checks)
         return {"ok": True, "checks": checks}
 
+    @app.get("/api/v1/debug/migrate")
+    def debug_migrate():
+        result = {"status": "ok", "details": [], "errors": []}
+        
+        # 1. Try running migrations
+        try:
+            from app.core.migrations import run_migrations
+            run_migrations()
+            result["details"].append("Migration command executed successfully")
+        except Exception as e:
+            result["status"] = "error"
+            result["errors"].append(f"Migration failed: {str(e)}")
+            import traceback
+            result["errors"].append(traceback.format_exc())
+
+        # 2. Check if columns exist
+        try:
+            from sqlalchemy import text
+            db = SessionLocalRead()
+            try:
+                # Check for reputation_score in users table
+                sql = text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='reputation_score'")
+                res = db.execute(sql).fetchone()
+                if res:
+                    result["details"].append("Column 'reputation_score' exists in 'users' table")
+                else:
+                    result["status"] = "error"
+                    result["errors"].append("Column 'reputation_score' MISSING in 'users' table")
+                
+                # Check for ai_moderation_checks table
+                sql = text("SELECT table_name FROM information_schema.tables WHERE table_name='ai_moderation_checks'")
+                res = db.execute(sql).fetchone()
+                if res:
+                    result["details"].append("Table 'ai_moderation_checks' exists")
+                else:
+                    result["status"] = "error"
+                    result["errors"].append("Table 'ai_moderation_checks' MISSING")
+            finally:
+                db.close()
+        except Exception as e:
+            result["status"] = "error"
+            result["errors"].append(f"DB check failed: {str(e)}")
+            
+        return result
+
     @app.api_route("/", methods=["GET", "HEAD"])
     def read_root(request: Request):
         try:
