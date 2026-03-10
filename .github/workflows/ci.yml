@@ -24,6 +24,10 @@ jobs:
           python -m compileall backend/app worker/app
           python backend/scripts/theme_audit.py
           python backend/scripts/check_no_raw_fetch.py
+      - name: Initialize database
+        run: |
+          cd backend
+          python init_db.py
       - name: Smoke tests
         run: |
           python backend/scripts/ci_smoke.py http://127.0.0.1:5002
