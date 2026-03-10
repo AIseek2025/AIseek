@@ -175,6 +175,11 @@ class VideoService:
         # NOTE: Many Homebrew builds omit drawtext. Keep the pipeline drawtext-free by default.
         video_filter = ffmpeg_background_filter(cover_orientation)
         
+        # Ensure aspect ratio is correct for mobile players (sometimes they stretch if SAR is missing)
+        # Force SAR 1:1
+        if "setsar=1" not in video_filter:
+            video_filter += ",setsar=1"
+
         if has_bgm:
             # We already have audio filter in filter_chains[0]
             video_filter_complex = f"[0:v]{video_filter}[vout]"
