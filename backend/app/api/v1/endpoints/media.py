@@ -250,6 +250,10 @@ def media_options():
             "corporate_1.mp3",
             "jazz_1.mp3",
             "rock_1.mp3",
+            "'Ceremonial Dance' by Darren-Curtis 🇺🇸 ｜ 🇨🇳 Traditional Oriental Beat (Non Copyrighted Music) 🐲.mp3",
+            "Chinese background music no copyright｜｜  chinese music no copyright.mp3",
+            "🐉 Chinese & Folk (Royalty Free Music) - \"LUNAR NEW YEAR\" by Alex Productions 🇮🇹.mp3",
+            "Sadness Chinese Instrumental Music - Bamboo Flute - Relaxing Music for Studying and Sleeping.mp3",
         ]
     for it in items:
         try:
