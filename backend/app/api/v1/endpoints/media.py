@@ -270,6 +270,7 @@ def media_options():
     moods = [
         {"id": "", "label": "默认"},
         {"id": "none", "label": "无BGM"},
+        {"id": "ancient", "label": "古风"},
         {"id": "hot", "label": "热门"},
         {"id": "tech", "label": "科技感"},
         {"id": "cheerful", "label": "轻快"},
