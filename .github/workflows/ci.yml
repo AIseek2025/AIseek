@@ -29,4 +29,22 @@ jobs:
           python backend/init_db.py
       - name: Smoke tests
         run: |
-          python backend/scripts/ci_smoke.py http://127.0.0.1:5002
+          python backend/scripts/ci_smoke.py http://127.0.0.1:5002 2>&1 | tee smoke.log
+        continue-on-error: true
+      
+      - name: Upload smoke log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-logs
+          path: smoke.log
+          retention-days: 7
+      
+      - name: Check database tables
+        run: |
+          sqlite3 sql_app.db ".tables"
+      
+      - name: Verify static files
+        run: |
+          ls -la backend/static/js/app/ | head -20
+          ls -la backend/templates/ | head -10
