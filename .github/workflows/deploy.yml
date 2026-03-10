@@ -1,0 +1,30 @@
+name: Deploy to Aliyun
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'worker/**'
+      - 'deploy/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.ALIYUN_HOST }}
+        username: ${{ secrets.ALIYUN_USER }}
+        key: ${{ secrets.ALIYUN_SSH_KEY }}
+        port: 22
+        script: |
+          # 进入项目部署目录 (请根据实际路径修改)
+          cd /root/AIseek-Trae-v1/deploy/aliyun
+          
+          # 赋予脚本执行权限
+          chmod +x update.sh
+          
+          # 执行更新脚本
+          ./update.sh
