@@ -12,7 +12,11 @@ git pull origin main
 echo "Rebuilding and restarting services..."
 docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
-# 3. Clean up unused images
+# 3. Run database migrations explicitly
+echo "Running database migrations..."
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+
+# 4. Clean up unused images
 echo "Cleaning up old images..."
 docker image prune -f
 
