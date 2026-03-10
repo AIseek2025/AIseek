@@ -35,6 +35,12 @@ class BGMService:
             "corporate": ["corporate_1.mp3", "corporate_2.mp3"],
             "jazz": ["jazz_1.mp3", "jazz_2.mp3"],
             "rock": ["rock_1.mp3", "rock_2.mp3"],
+            "ancient": [
+                "'Ceremonial Dance' by Darren-Curtis 🇺🇸 ｜ 🇨🇳 Traditional Oriental Beat (Non Copyrighted Music) 🐲.mp3",
+                "Chinese background music no copyright｜｜  chinese music no copyright.mp3",
+                "🐉 Chinese & Folk (Royalty Free Music) - \"LUNAR NEW YEAR\" by Alex Productions 🇮🇹.mp3",
+                "Sadness Chinese Instrumental Music - Bamboo Flute - Relaxing Music for Studying and Sleeping.mp3"
+            ]
         }
 
     def list_bgms(self) -> list[str]:
