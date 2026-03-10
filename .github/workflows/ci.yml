@@ -28,6 +28,23 @@ jobs:
         run: |
           cd backend
           python init_db.py
+      - name: Start backend service
+        run: |
+          cd backend
+          nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 5002 > /tmp/backend.log 2>&1 &
+          echo "Waiting for backend to start..."
+          sleep 5
+          for i in {1..10}; do
+            if curl -s http://127.0.0.1:5002/health > /dev/null 2>&1; then
+              echo "Backend is ready!"
+              exit 0
+            fi
+            echo "Waiting... ($i/10)"
+            sleep 2
+          done
+          echo "Backend failed to start. Logs:"
+          cat /tmp/backend.log
+          exit 1
       - name: Smoke tests
         run: |
           python backend/scripts/ci_smoke.py http://127.0.0.1:5002
