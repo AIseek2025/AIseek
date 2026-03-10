@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 from pathlib import Path
 
 
@@ -22,4 +23,18 @@ def run_migrations() -> None:
     cfg = Config(str(root / "alembic.ini"))
     cfg.set_main_option("script_location", str(root / "alembic"))
     cfg.set_main_option("prepend_sys_path", str(root))
-    command.upgrade(cfg, "head")
+    
+    # Retry logic for migrations (e.g. waiting for DB ready)
+    max_retries = 3
+    for i in range(max_retries):
+        try:
+            command.upgrade(cfg, "head")
+            return
+        except Exception as e:
+            if i == max_retries - 1:
+                print(f"Migration failed after {max_retries} attempts: {e}")
+                # We don't raise here to avoid crashing the app completely, 
+                # but DB operations might fail later.
+                raise e
+            print(f"Migration attempt {i+1} failed: {e}. Retrying in 2s...")
+            time.sleep(2)

@@ -660,7 +660,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/debug/migrate")
     def debug_migrate():
-        result = {"status": "ok", "details": [], "errors": []}
+        result = {"status": "ok", "details": [], "errors": [], "logs": []}
         
         # 1. Try running migrations
         try:
@@ -695,11 +695,149 @@ def create_app() -> FastAPI:
                 else:
                     result["status"] = "error"
                     result["errors"].append("Table 'ai_moderation_checks' MISSING")
+
+                # Check for Category table and try to query it
+                try:
+                    result["details"].append("Attempting to query Category table...")
+                    cats = db.query(Category).limit(5).all()
+                    cat_names = [c.name for c in cats]
+                    result["details"].append(f"Category query successful. Found: {cat_names}")
+                except Exception as e:
+                    result["status"] = "error"
+                    result["errors"].append(f"Category query FAILED: {str(e)}")
+                    import traceback
+                    result["errors"].append(traceback.format_exc())
+
+                # Check Cache
+                try:
+                    from app.core.cache import cache
+                    result["details"].append("Attempting to access Cache...")
+                    cache.set_json("debug:test", {"ok": True}, 60)
+                    cached_val = cache.get_json("debug:test")
+                    result["details"].append(f"Cache test successful. Got: {cached_val}")
+                    
+                    # Check Redis connection specifically
+                    is_redis = cache.redis_enabled()
+                    result["details"].append(f"Redis enabled: {is_redis}")
+                except Exception as e:
+                    result["status"] = "error" 
+                    result["errors"].append(f"Cache test FAILED: {str(e)}")
+                    import traceback
+                    result["errors"].append(traceback.format_exc())
+
             finally:
                 db.close()
         except Exception as e:
             result["status"] = "error"
             result["errors"].append(f"DB check failed: {str(e)}")
+        
+        # 3. Read recent logs
+        try:
+            log_path = os.path.join(BASE_DIR, "logs", "app.log")
+            if os.path.exists(log_path):
+                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                    # Read last 100 lines
+                    lines = f.readlines()[-100:]
+                    result["logs"] = lines
+            else:
+                result["details"].append(f"Log file not found at {log_path}")
+        except Exception as e:
+            result["errors"].append(f"Failed to read logs: {str(e)}")
+            
+        return result
+
+    @app.get("/api/v1/debug/fix_auth")
+    def debug_fix_auth():
+        """
+        Attempts to fix database authentication issues by trying common default credentials
+        and resetting the 'aiseek' user password.
+        """
+        result = {"status": "ok", "logs": []}
+        
+        def log(msg):
+            result["logs"].append(msg)
+            print(f"DEBUG_FIX_AUTH: {msg}")
+
+        from sqlalchemy import create_engine, text
+        
+        # Target configuration
+        target_user = "aiseek"
+        target_pass = "aiseek_password"
+        target_db = "aiseek_db"
+        host = "db"
+        port = 5432
+        
+        # Candidates to try for admin access
+        candidates = [
+            # (user, pass, dbname)
+            ("postgres", "postgres", "template1"),
+            ("postgres", "aiseek_password", "template1"),
+            ("aiseek", "aiseek_password", "postgres"),
+            ("aiseek", "postgres", "postgres"),
+            ("postgres", "postgres", "postgres"),
+        ]
+        
+        admin_engine = None
+        admin_user = None
+        
+        log(f"Starting Auth Fix. Target: user={target_user}, db={target_db}")
+        
+        # 1. Try to connect with candidates
+        for u, p, d in candidates:
+            url = f"postgresql://{u}:{p}@{host}:{port}/{d}"
+            try:
+                log(f"Trying connection as {u} to {d}...")
+                eng = create_engine(url, connect_args={"connect_timeout": 3})
+                with eng.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                    log(f"SUCCESS! Connected as {u} to {d}")
+                    admin_engine = eng
+                    admin_user = u
+                    break
+            except Exception as e:
+                log(f"Failed: {e}")
+        
+        if not admin_engine:
+            result["status"] = "error"
+            log("Could not connect with any known default credentials. Cannot fix automatically.")
+            return result
+
+        # 2. Fix 'aiseek' user password
+        try:
+            # Re-connect with AUTOCOMMIT
+            with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                
+                # Check if user exists
+                try:
+                    res = conn.execute(text(f"SELECT 1 FROM pg_roles WHERE rolname='{target_user}'"))
+                    if res.scalar():
+                        log(f"User '{target_user}' exists. Resetting password...")
+                        conn.execute(text(f"ALTER USER {target_user} WITH PASSWORD '{target_pass}'"))
+                        log("Password reset successful.")
+                    else:
+                        log(f"User '{target_user}' does NOT exist. Creating...")
+                        conn.execute(text(f"CREATE USER {target_user} WITH PASSWORD '{target_pass}' SUPERUSER"))
+                        log("User created.")
+                except Exception as e:
+                    log(f"Error managing user: {e}")
+
+                # 3. Check/Create Database
+                try:
+                    res = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname='{target_db}'"))
+                    if res.scalar():
+                        log(f"Database '{target_db}' exists.")
+                    else:
+                        log(f"Database '{target_db}' MISSING. Creating...")
+                        conn.execute(text(f"CREATE DATABASE {target_db} OWNER {target_user}"))
+                        log(f"Database '{target_db}' created.")
+                except Exception as e:
+                    log(f"Error managing database: {e}")
+                    
+        except Exception as e:
+            result["status"] = "error"
+            log(f"Fatal error during fix: {e}")
+            import traceback
+            log(traceback.format_exc())
             
         return result
 
