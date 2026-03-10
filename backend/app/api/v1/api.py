@@ -20,3 +20,11 @@ api_router.include_router(ai_jobs.router, prefix="/ai", tags=["ai"])
 api_router.include_router(ops.router, prefix="/ops", tags=["ops"])
 from app.api.v1.endpoints.ai_creation import routes as ai_routes
 api_router.include_router(ai_routes.router, prefix="/ai", tags=["ai"])
+
+@api_router.get("/health", tags=["system"])
+def health_check():
+    return {"status": "ok"}
+
+@api_router.get("/system/health", tags=["system"])
+def system_health_check():
+    return {"status": "ok"}

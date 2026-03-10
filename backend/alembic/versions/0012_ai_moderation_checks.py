@@ -37,20 +37,8 @@ def upgrade() -> None:
         ("idx_ai_mod_status", ["status"]),
         ("idx_ai_mod_decided_by", ["decided_by"]),
     ):
-        try:
-            op.create_index(idx, "ai_moderation_checks", cols)
-        except Exception:
-            pass
-
-
+        op.create_index(idx, "ai_moderation_checks", cols)
 def downgrade() -> None:
     for idx in ("idx_ai_mod_decided_by", "idx_ai_mod_status", "idx_ai_mod_post_id", "idx_ai_mod_user_id", "idx_ai_mod_job_id"):
-        try:
-            op.drop_index(idx, table_name="ai_moderation_checks")
-        except Exception:
-            pass
-    try:
-        op.drop_table("ai_moderation_checks")
-    except Exception:
-        pass
-
+        op.drop_index(idx, table_name="ai_moderation_checks")
+    op.drop_table("ai_moderation_checks")

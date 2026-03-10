@@ -18,8 +18,8 @@ def run_migrations() -> None:
     except Exception:
         return
 
-    root = Path(__file__).resolve().parents[3]
+    root = Path(__file__).resolve().parents[2]
     cfg = Config(str(root / "alembic.ini"))
-    cfg.set_main_option("script_location", "backend/alembic")
-    cfg.set_main_option("prepend_sys_path", "backend")
+    cfg.set_main_option("script_location", str(root / "alembic"))
+    cfg.set_main_option("prepend_sys_path", str(root))
     command.upgrade(cfg, "head")

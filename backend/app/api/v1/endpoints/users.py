@@ -100,6 +100,11 @@ def _set_total_count_cached(response: Response, key: str, builder) -> None:
         pass
 
 
+@router.get("/me")
+def read_user_me(current_user: User = Depends(get_current_user)):
+    return user_to_dict(current_user)
+
+
 @router.get("/all")
 def list_all_users(q: Optional[str] = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not getattr(current_user, 'is_superuser', False):

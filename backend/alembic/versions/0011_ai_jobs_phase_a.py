@@ -36,21 +36,11 @@ def upgrade() -> None:
             "CREATE INDEX IF NOT EXISTS idx_ai_jobs_stage ON ai_jobs(stage)",
             "CREATE INDEX IF NOT EXISTS idx_ai_jobs_worker_task_id ON ai_jobs(worker_task_id)",
         ):
-            try:
-                op.execute(stmt)
-            except Exception:
-                pass
+            op.execute(stmt)
         return
 
-    try:
-        op.add_column("posts", sa.Column("ai_job_id", sa.String(), nullable=True))
-    except Exception:
-        pass
-    try:
-        op.create_index("idx_posts_ai_job_id", "posts", ["ai_job_id"])
-    except Exception:
-        pass
-
+    op.add_column("posts", sa.Column("ai_job_id", sa.String(), nullable=True))
+    op.create_index("idx_posts_ai_job_id", "posts", ["ai_job_id"])
     for name, col in (
         ("post_id", sa.Column("post_id", sa.Integer(), nullable=True)),
         ("kind", sa.Column("kind", sa.String(), nullable=True)),
@@ -61,23 +51,14 @@ def upgrade() -> None:
         ("worker_task_id", sa.Column("worker_task_id", sa.String(), nullable=True)),
         ("cancelled_at", sa.Column("cancelled_at", sa.DateTime(timezone=True), nullable=True)),
     ):
-        try:
-            op.add_column("ai_jobs", col)
-        except Exception:
-            pass
-
+        op.add_column("ai_jobs", col)
     for idx, cols in (
         ("idx_ai_jobs_post_id", ["post_id"]),
         ("idx_ai_jobs_kind", ["kind"]),
         ("idx_ai_jobs_stage", ["stage"]),
         ("idx_ai_jobs_worker_task_id", ["worker_task_id"]),
     ):
-        try:
-            op.create_index(idx, "ai_jobs", cols)
-        except Exception:
-            pass
-
-
+        op.create_index(idx, "ai_jobs", cols)
 def downgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
@@ -89,16 +70,7 @@ def downgrade() -> None:
             ("idx_ai_jobs_post_id", "ai_jobs"),
             ("idx_posts_ai_job_id", "posts"),
         ):
-            try:
-                op.drop_index(idx, table_name=table)
-            except Exception:
-                pass
+            op.drop_index(idx, table_name=table)
         for col in ("cancelled_at", "worker_task_id", "draft_json", "input_json", "stage_message", "stage", "kind", "post_id"):
-            try:
-                op.drop_column("ai_jobs", col)
-            except Exception:
-                pass
-        try:
-            op.drop_column("posts", "ai_job_id")
-        except Exception:
-            pass
+            op.drop_column("ai_jobs", col)
+        op.drop_column("posts", "ai_job_id")

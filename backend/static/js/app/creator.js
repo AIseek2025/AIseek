@@ -64,6 +64,36 @@ Object.assign(window.app, {
         }
     },
 
+    creatorReadVideoDuration: function(file) {
+        return new Promise((resolve) => {
+            try {
+                if (!file || !String(file.type || '').startsWith('video')) return resolve(null);
+                const u = URL.createObjectURL(file);
+                const v = document.createElement('video');
+                let done = false;
+                const finish = (val) => {
+                    if (done) return;
+                    done = true;
+                    try { URL.revokeObjectURL(u); } catch (_) {}
+                    resolve(Number.isFinite(Number(val)) && Number(val) > 0 ? Number(val) : null);
+                };
+                const t = setTimeout(() => finish(null), 8000);
+                v.preload = 'metadata';
+                v.onloadedmetadata = () => {
+                    try { clearTimeout(t); } catch (_) {}
+                    finish(v.duration);
+                };
+                v.onerror = () => {
+                    try { clearTimeout(t); } catch (_) {}
+                    finish(null);
+                };
+                v.src = u;
+            } catch (_) {
+                resolve(null);
+            }
+        });
+    },
+
     creatorSubmitManual: async function() {
         if (!this.state.manualFiles || this.state.manualFiles.length === 0) return alert('请先上传图片或视频');
         if (!this.state.user) return this.openModal('authModal');
@@ -79,10 +109,15 @@ Object.assign(window.app, {
             // 1. Upload Files
             const fileKeys = [];
             const isVideo = this.state.manualFiles[0].type.startsWith('video');
+            let videoDurationSec = null;
             
             // Show loading
             const btn = document.querySelector('.creator-actions .btn-primary');
             if(btn) { btn.innerText = '发布中...'; btn.disabled = true; }
+
+            if (isVideo) {
+                videoDurationSec = await this.creatorReadVideoDuration(this.state.manualFiles[0]);
+            }
 
             // Upload sequentially
             for (const file of this.state.manualFiles) {
@@ -119,6 +154,9 @@ Object.assign(window.app, {
             
             if (isVideo) {
                 payload.file_key = fileKeys[0];
+                if (Number.isFinite(Number(videoDurationSec)) && Number(videoDurationSec) > 0) {
+                    payload.duration = Math.max(1, Math.round(Number(videoDurationSec)));
+                }
             } else {
                 payload.images = fileKeys;
             }

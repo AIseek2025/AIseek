@@ -33,7 +33,15 @@ class StorageService:
                 rel = str(object_name or "").strip().lstrip("/")
                 if not rel:
                     rel = os.path.basename(src)
-                repo_root = Path(__file__).resolve().parents[3]
+                
+                p = Path(__file__).resolve()
+                repo_root = p.parents[3]
+                # Check for Docker structure first
+                if len(p.parents) > 1 and (p.parents[1] / "backend").exists():
+                    repo_root = p.parents[1]
+                elif len(p.parents) > 2 and (p.parents[2] / "backend").exists():
+                    repo_root = p.parents[2]
+                
                 out_root = repo_root / "backend" / "static" / "worker_media"
                 dst = out_root / rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
@@ -108,8 +116,16 @@ class StorageService:
 
         if not self.client:
             try:
-                repo_root = Path(__file__).resolve().parents[3]
+                p = Path(__file__).resolve()
+                repo_root = p.parents[3]
+                # Check for Docker structure first
+                if len(p.parents) > 1 and (p.parents[1] / "backend").exists():
+                    repo_root = p.parents[1]
+                elif len(p.parents) > 2 and (p.parents[2] / "backend").exists():
+                    repo_root = p.parents[2]
+
                 out_root = repo_root / "backend" / "static" / "worker_media" / prefix
+                logger.info(f"Local upload directory target: {out_root}")
                 out_root.mkdir(parents=True, exist_ok=True)
                 for root, _dirs, files in os.walk(base_dir):
                     rel_root = os.path.relpath(root, base_dir)
@@ -122,7 +138,8 @@ class StorageService:
                 if os.path.exists(os.path.join(base_dir, "master.m3u8")):
                     return f"/static/worker_media/{prefix}/master.m3u8"
                 return f"/static/worker_media/{prefix}"
-            except Exception:
+            except Exception as e:
+                logger.error(f"Local upload directory failed: {e}")
                 return None
 
         def _upload_all():

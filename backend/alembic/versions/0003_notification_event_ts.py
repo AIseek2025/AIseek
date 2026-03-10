@@ -16,7 +16,8 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("ALTER TABLE notification_events ADD COLUMN created_at_ts REAL")
-    op.execute("UPDATE notification_events SET created_at_ts = CAST(strftime('%s', created_at) AS REAL) WHERE created_at_ts IS NULL")
+    # Use PostgreSQL-compatible syntax (EXTRACT EPOCH) instead of SQLite's strftime
+    op.execute("UPDATE notification_events SET created_at_ts = EXTRACT(EPOCH FROM created_at) WHERE created_at_ts IS NULL")
     op.execute("CREATE INDEX IF NOT EXISTS idx_notification_events_user_ts_id ON notification_events(user_id, created_at_ts DESC, id DESC)")
 
 

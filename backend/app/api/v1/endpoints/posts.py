@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 from datetime import datetime
 import uuid
+import subprocess
+from pathlib import Path
 
 from app.core.cache import cache
 from app.core.ai_stages import stage_rank, allow_draft_write, allow_assistant_message_write
@@ -14,6 +16,63 @@ from app.services.feed_service import get_feed as get_feed_service
 from app.services.post_presenter import decorate_flags, serialize_post_base
 
 router = APIRouter()
+
+
+def _probe_local_video_duration_sec(source_url: Optional[str]) -> Optional[int]:
+    try:
+        s = str(source_url or "")
+        target_path = ""
+        if s.startswith("http://") or s.startswith("https://"):
+            target_path = s
+        elif s.startswith("/static/"):
+            p = Path(__file__).resolve().parents[4] / "static" / s[len("/static/") :]
+            if p.exists() and p.is_file():
+                target_path = str(p)
+        
+        if not target_path:
+            return None
+
+        cmd = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            target_path,
+        ]
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=10).decode("utf-8", errors="ignore").strip()
+        d = int(round(float(out)))
+        return d if d > 0 else None
+    except Exception:
+        return None
+
+
+def _normalize_duration_value(value: Optional[Any]) -> Optional[int]:
+    try:
+        if value is None:
+            return None
+        d = int(value)
+        return d if d > 0 else None
+    except Exception:
+        return None
+
+
+def _pick_duration_with_fallback(
+    duration: Optional[Any],
+    mp4_url: Optional[str],
+    video_url: Optional[str],
+    source_url: Optional[str],
+) -> Optional[int]:
+    d = _normalize_duration_value(duration)
+    if d:
+        return d
+    for u in (mp4_url, video_url, source_url):
+        d2 = _probe_local_video_duration_sec(u)
+        if d2:
+            return d2
+    return None
 
 class PostCreate(BaseModel):
     content: str = "" # Optional if file uploaded
@@ -27,6 +86,7 @@ class PostCreate(BaseModel):
     title: Optional[str] = None
     file_key: Optional[str] = None # S3 Key or Local Key
     images: Optional[List[str]] = None # List of S3 Keys for image post
+    duration: Optional[int] = None
 
 class PostOut(BaseModel):
     id: int
@@ -297,12 +357,25 @@ def list_categories(db: Session = Depends(get_read_db)):
 
 
 @router.get("/{post_id}", response_model=PostOut)
-def get_post(post_id: int, user_id: Optional[int] = None, db: Session = Depends(get_read_db)):
+def get_post(
+    post_id: int,
+    user_id: Optional[int] = None,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_read_db)
+):
+    # Try to get user_id from token if not provided
+    if user_id is None and authorization:
+        uid = _maybe_current_user_id(authorization, db)
+        if uid:
+            user_id = uid
+
     try:
         if user_id is not None:
             post0 = db.query(Post).options(joinedload(Post.owner), joinedload(Post.active_media_asset)).filter(Post.id == post_id).first()
-            if post0 and post0.status != "done":
-                if int(user_id) == int(post0.user_id) and str(post0.status) in {"processing", "queued", "failed", "returned"}:
+            if post0:
+                # Allow owner to see preview/processing/etc
+                # Added "preview" to the allowed statuses
+                if int(user_id) == int(post0.user_id) and str(post0.status) in {"processing", "queued", "failed", "returned", "preview"}:
                     base0 = _serialize_post_base(post0)
                     items0 = decorate_flags([base0], user_id, db)
                     return items0[0]
@@ -377,6 +450,8 @@ def create_post(post_in: PostCreate, current_user: User = Depends(get_current_us
     )
     
     video_input = None
+    use_s3 = False
+    should_enqueue_process = False
 
     if is_upload:
         from app.core.config import settings
@@ -391,20 +466,40 @@ def create_post(post_in: PostCreate, current_user: User = Depends(get_current_us
                 db_post.source_url = post_in.file_key
                 db_post.video_url = post_in.file_key
                 video_input = post_in.file_key
-                if use_s3:
-                    db_post.status = "processing"
-                else:
-                    db_post.status = "done"
+                should_enqueue_process = bool(use_s3)
+                db_post.status = "processing" if should_enqueue_process else "done"
             else:
                 db_post.source_key = post_in.file_key
-                db_post.source_url = f"{base_url}/{post_in.file_key}"
-                db_post.video_url = db_post.source_url
-                if use_s3:
-                    video_input = post_in.file_key
-                    db_post.status = "processing"
-                else:
+                local_abs = Path(__file__).resolve().parents[4] / "static" / str(post_in.file_key)
+                local_exists = bool(str(post_in.file_key).startswith("uploads/") and local_abs.exists() and local_abs.is_file())
+                if local_exists:
+                    db_post.source_url = f"/static/{post_in.file_key}"
+                    db_post.video_url = db_post.source_url
                     video_input = db_post.source_url
+                    should_enqueue_process = False
                     db_post.status = "done"
+                else:
+                    db_post.source_url = f"{base_url}/{post_in.file_key}"
+                    db_post.video_url = db_post.source_url
+                    if use_s3:
+                        video_input = post_in.file_key
+                        should_enqueue_process = True
+                        db_post.status = "processing"
+                    else:
+                        video_input = db_post.source_url
+                        should_enqueue_process = False
+                        db_post.status = "done"
+            if post_in.duration is not None:
+                try:
+                    d = int(post_in.duration)
+                    if d > 0:
+                        db_post.duration = d
+                except Exception:
+                    pass
+            if not getattr(db_post, "duration", None):
+                d2 = _probe_local_video_duration_sec(getattr(db_post, "source_url", None))
+                if d2:
+                    db_post.duration = int(d2)
             
         elif post_in.post_type == "image_text" and (post_in.images or post_in.file_key):
             if post_in.file_key:
@@ -467,7 +562,7 @@ def create_post(post_in: PostCreate, current_user: User = Depends(get_current_us
 
         if is_upload:
             if post_in.post_type == "video":
-                if video_input and use_s3:
+                if video_input and should_enqueue_process:
                     send_worker_task("process_upload_video", args=[str(db_post.id), video_input, str(uid)])
         else:
             tid = send_worker_task("generate_video", args=[str(ai_job_id or db_post.id), post_in.content, str(uid)], kwargs={
@@ -531,6 +626,10 @@ async def worker_callback(
     x_worker_secret: str = Header(None),
     db: Session = Depends(get_db),
 ):
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    logger.info(f"DEBUG: callback received for job_id={data.job_id} status={data.status} progress={data.progress}")
+
     """Receive status updates from worker."""
     def _metric(field: str, delta: int = 1, threshold_key: str = "", sample_payload: Optional[dict] = None) -> None:
         try:
@@ -710,8 +809,10 @@ async def worker_callback(
         post_id = None
     if post_id is not None:
         post = db.query(Post).filter(Post.id == int(post_id)).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Allow callback if either Post or Job exists
+    if not post and not job:
+        raise HTTPException(status_code=404, detail="Post or Job not found")
 
     st = (data.status or "").strip().lower()
     if st in {"completed", "success", "published"}:
@@ -733,8 +834,8 @@ async def worker_callback(
             if c == n:
                 return True
             allow = {
-                "queued": {"queued", "processing", "done", "failed", "cancelled"},
-                "processing": {"processing", "done", "failed", "cancelled"},
+                "queued": {"queued", "processing", "preview", "done", "failed", "cancelled"},
+                "processing": {"processing", "preview", "done", "failed", "cancelled"},
                 "preview": {"preview", "done", "failed", "cancelled"},
                 "done": {"done"},
                 "failed": {"failed", "processing", "done", "cancelled"},
@@ -743,9 +844,10 @@ async def worker_callback(
             return n in allow.get(c, {n})
 
         cur_job = str(getattr(job, "status", "") or "") if job else ""
-        cur_post = str(getattr(post, "status", "") or "")
+        cur_post = str(getattr(post, "status", "") or "") if post else ""
+        
         if job and not _allow_status_transition(cur_job, st):
-            payload = {"reason": "job_status_regress", "job_id": str(getattr(data, "job_id", "") or ""), "post_id": int(getattr(post, "id", 0) or 0), "cur": cur_job, "new": st, "stage": getattr(data, "stage", None), "progress": getattr(data, "progress", None)}
+            payload = {"reason": "job_status_regress", "job_id": str(getattr(data, "job_id", "") or ""), "post_id": int(getattr(post, "id", 0) or 0) if post else 0, "cur": cur_job, "new": st, "stage": getattr(data, "stage", None), "progress": getattr(data, "progress", None)}
             _metric("ignored_job_status_regress", 1, "ij", payload)
             _sample("ignored", payload)
             return {"status": "ok", "ignored": True, "reason": "job_status_regress", "cur": cur_job, "new": st}
@@ -756,7 +858,8 @@ async def worker_callback(
             return {"status": "ok", "ignored": True, "reason": "post_status_regress", "cur": cur_post, "new": st_post}
     except Exception:
         pass
-    if data.no_post_status is not True:
+    
+    if post and data.no_post_status is not True:
         post.status = st_post
     try:
         if job:
@@ -874,7 +977,9 @@ async def worker_callback(
                     job.result_json = cur
             except Exception:
                 pass
+            logger.info(f"DEBUG: committing job update job_id={job.id} status={job.status} progress={job.progress}")
             db.commit()
+            logger.info(f"DEBUG: commit successful")
             try:
                 from app.api.v1.endpoints.ai_jobs import _append_job_event
 
@@ -910,6 +1015,13 @@ async def worker_callback(
     if not ver:
         ver = str(uuid.uuid4())
 
+    final_duration = _pick_duration_with_fallback(
+        data.duration,
+        mp4_url,
+        video_url,
+        getattr(post, "source_url", None),
+    )
+
     if hls_url or mp4_url or cov:
         asset = MediaAsset(
             post_id=int(post.id),
@@ -917,7 +1029,7 @@ async def worker_callback(
             hls_url=hls_url,
             mp4_url=mp4_url,
             cover_url=cov,
-            duration=int(data.duration) if data.duration is not None else None,
+            duration=final_duration,
             video_width=int(data.video_width) if data.video_width is not None else None,
             video_height=int(data.video_height) if data.video_height is not None else None,
             subtitle_tracks=data.subtitle_tracks,
@@ -936,11 +1048,8 @@ async def worker_callback(
         post.processed_url = mp4_url
     if cov:
         post.cover_url = cov
-    if data.duration is not None:
-        try:
-            post.duration = int(data.duration)
-        except Exception:
-            pass
+    if final_duration is not None:
+        post.duration = int(final_duration)
     if data.video_width is not None:
         try:
             post.video_width = int(data.video_width)
@@ -1019,6 +1128,36 @@ def _require_admin(authorization: str = Header(None), db: Session = Depends(get_
     if not getattr(u, "is_superuser", False):
         raise HTTPException(status_code=403, detail="Forbidden")
     return u
+
+
+@router.post("/admin/fix_durations")
+def admin_fix_durations(
+    limit: int = 50,
+    current_user: User = Depends(_require_admin),
+    db: Session = Depends(get_db),
+):
+    from sqlalchemy import or_
+    posts = db.query(Post).filter(Post.status == "done", or_(Post.duration == 0, Post.duration == None)).limit(limit).all()
+    updated = []
+    for p in posts:
+        d = _probe_local_video_duration_sec(getattr(p, "video_url", None) or getattr(p, "processed_url", None) or getattr(p, "source_url", None))
+        if d and d > 0:
+            p.duration = int(d)
+            updated.append({"id": int(p.id), "duration": int(d)})
+    
+    if updated:
+        db.commit()
+        for item in updated:
+            try:
+                cache.bump(f"post:{item['id']}")
+            except Exception:
+                pass
+        try:
+            cache.bump("feed:all")
+        except Exception:
+            pass
+            
+    return {"ok": True, "count": len(updated), "updated": updated}
 
 
 @router.get("/admin/list", response_model=List[AdminPostOut])

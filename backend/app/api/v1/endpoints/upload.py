@@ -76,7 +76,10 @@ async def local_upload(file: UploadFile = File(...), key: Optional[str] = Form(N
     if not key:
         # Fallback generation if key missing
         ext = file.filename.split('.')[-1]
-        key = f"uploads/images/{uuid.uuid4()}.{ext}" # Default to image for safety if unknown
+        ctype = str(getattr(file, "content_type", "") or "").lower()
+        is_video = ctype.startswith("video/") or str(ext or "").lower() in {"mp4", "mov", "mkv", "webm", "m4v", "avi"}
+        folder = "videos" if is_video else "images"
+        key = f"uploads/{folder}/{uuid.uuid4()}.{ext}"
     
     # Security check: ensure key starts with uploads/
     if not key.startswith("uploads/"):

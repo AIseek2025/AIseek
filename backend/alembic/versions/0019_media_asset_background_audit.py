@@ -19,24 +19,12 @@ def upgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
     if dialect == "sqlite":
-        try:
-            op.execute("ALTER TABLE media_assets ADD COLUMN background_audit TEXT")
-        except Exception:
-            pass
+        op.execute("ALTER TABLE media_assets ADD COLUMN background_audit TEXT")
         return
-    try:
-        op.add_column("media_assets", sa.Column("background_audit", sa.JSON(), nullable=True))
-    except Exception:
-        pass
-
-
+    op.add_column("media_assets", sa.Column("background_audit", sa.JSON(), nullable=True))
 def downgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
     if dialect == "sqlite":
         return
-    try:
-        op.drop_column("media_assets", "background_audit")
-    except Exception:
-        pass
-
+    op.drop_column("media_assets", "background_audit")

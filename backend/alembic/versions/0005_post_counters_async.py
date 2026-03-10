@@ -21,18 +21,18 @@ def upgrade() -> None:
         "likes_count INTEGER DEFAULT 0,"
         "favorites_count INTEGER DEFAULT 0,"
         "comments_count INTEGER DEFAULT 0,"
-        "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+        "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")"
     )
 
     op.execute(
         "CREATE TABLE IF NOT EXISTS post_counter_events ("
-        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "id SERIAL PRIMARY KEY,"
         "post_id INTEGER NOT NULL,"
         "counter VARCHAR NOT NULL,"
         "delta INTEGER NOT NULL,"
         "event_key VARCHAR NOT NULL UNIQUE,"
-        "created_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+        "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
         ")"
     )
     op.execute("CREATE INDEX IF NOT EXISTS idx_post_counter_events_post ON post_counter_events(post_id)")

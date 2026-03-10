@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.all_models import AIJob
+from app.models.all_models import AIJob, Post
 from app.tasks.ai_creation import run_ai_pipeline
 from app.core.config import get_settings
 
@@ -52,10 +52,39 @@ async def create_ai_job(req: AICreateRequest):
     payload = req.dict()
 
     db: Session = SessionLocal()
+    post_id = None
     try:
-        job = AIJob(id=job_id, user_id=req.user_id, status="queued", progress=0)
+        # Create Post first
+        post = Post(
+            user_id=req.user_id,
+            content_text=req.long_text,
+            post_type="video",
+            status="processing",
+            category=req.category,
+            custom_instructions=req.prompt,
+            download_enabled=True,
+            title="AI Generated Video"
+        )
+        db.add(post)
+        db.flush() # get ID
+        post_id = post.id
+
+        job = AIJob(
+            id=job_id, 
+            user_id=req.user_id, 
+            post_id=post_id,
+            status="queued", 
+            progress=0
+        )
         db.add(job)
+        
+        # Link job to post
+        post.ai_job_id = job_id
+        
         db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error")
     finally:
         try:
             db.close()
@@ -64,12 +93,27 @@ async def create_ai_job(req: AICreateRequest):
 
     try:
         from app.core.celery_app import apply_async_with_context
+        from app.tasks.ai_creation import generate_video
 
-        apply_async_with_context(run_ai_pipeline, args=[job_id, payload])
-    except Exception:
-        run_ai_pipeline.delay(job_id, payload)
+        task_kwargs = {
+            "job_id": job_id,
+            "post_id": str(post_id) if post_id else None,
+            "content": req.long_text,
+            "user_id": str(req.user_id),
+            "custom_instructions": req.prompt,
+            "post_type": "video",
+        }
+        print(f"DEBUG: Sending task generate_video to queue 'ai' with kwargs: {task_kwargs}")
+        res = apply_async_with_context(generate_video, kwargs=task_kwargs, queue="ai")
+        print(f"DEBUG: Task sent result: {res}")
+    except Exception as e:
+        print(f"ERROR: Failed to send task: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fallback without context if needed, though apply_async_with_context handles exceptions internally too
+        pass
 
-    return {"success": True, "job_id": job_id, "message": "AI任务已提交"}
+    return {"success": True, "job_id": job_id, "post_id": post_id, "message": "AI任务已提交"}
 
 @router.get("/status/{job_id}")
 async def get_job_status(job_id: str):

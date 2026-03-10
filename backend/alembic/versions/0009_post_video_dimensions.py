@@ -24,33 +24,15 @@ def upgrade() -> None:
             "ALTER TABLE posts ADD COLUMN video_width INTEGER",
             "ALTER TABLE posts ADD COLUMN video_height INTEGER",
         ):
-            try:
-                op.execute(sql)
-            except Exception:
-                pass
+            op.execute(sql)
         return
 
-    try:
-        op.add_column("posts", sa.Column("video_width", sa.Integer(), nullable=True))
-    except Exception:
-        pass
-    try:
-        op.add_column("posts", sa.Column("video_height", sa.Integer(), nullable=True))
-    except Exception:
-        pass
-
-
+    op.add_column("posts", sa.Column("video_width", sa.Integer(), nullable=True))
+    op.add_column("posts", sa.Column("video_height", sa.Integer(), nullable=True))
 def downgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
     if dialect == "sqlite":
         return
-    try:
-        op.drop_column("posts", "video_height")
-    except Exception:
-        pass
-    try:
-        op.drop_column("posts", "video_width")
-    except Exception:
-        pass
-
+    op.drop_column("posts", "video_height")
+    op.drop_column("posts", "video_width")

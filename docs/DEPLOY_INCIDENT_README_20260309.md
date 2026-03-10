@@ -192,6 +192,39 @@ s3.upload_file(file_path, bucket_name, key)  # 会失败！
 
 ---
 
+## ✅ 附录：AI 创作“0秒”问题最终验收（生产）
+
+### 验收结论
+- AI 链路已恢复，`media_assets` 已落库，且时长为正常值（非 0 秒）
+- 关键样本时长：`43s / 44s / 63s`
+- 新任务已可从 `processing` 推进到 `done`
+
+### 验收 SQL 结果摘要（节选）
+
+`media_assets`（节选）：
+
+| id | post_id | duration | mp4_url | hls_url |
+|---:|---:|---:|---|---|
+| 6 | 22 | 63 | `/static/worker_media/videos/b60a...bbb5.mp4` | `/static/worker_media/hls/b60a...5c93/master.m3u8` |
+| 5 | 1 | 44 | `/static/worker_media/videos/15ce...ad9f.mp4` | `/static/worker_media/hls/15ce...71fd/master.m3u8` |
+| 4 | 23 | 43 | `/static/worker_media/videos/afb3...6737.mp4` | `/static/worker_media/hls/afb3...9b9f/master.m3u8` |
+| 3 | 16 | 44 | `/static/worker_media/videos/9d5c...e398.mp4` | `/static/worker_media/hls/9d5c...cc44/master.m3u8` |
+
+`ai_jobs`（节选）：
+
+| job_id | status | stage |
+|---|---|---|
+| afb314cd-8129-448b-bb88-74c4d57b3214 | done | done |
+| b60a252c-65aa-4855-8ae1-f91b1acf9562 | done | done |
+| 9d5cbfe5-d11d-4a32-af6d-ebf6cb0a3b4c | done | done |
+| 15ce20c4-d794-4bd2-ba2d-2a415ff5b01f | done | done |
+
+### 说明
+- 历史“卡 processing”任务已按标准流程收口
+- 当前生产以发布包目录运行（非 git 工作副本），后续更新按发布包流程执行
+
+---
+
 ## 🎯 经验教训
 
 ### 1. SDK 选择很重要
@@ -214,8 +247,9 @@ s3.upload_file(file_path, bucket_name, key)  # 会失败！
 - [备份上传脚本](../tools/backup_upload_s3.py)
 - [备份工作流](../.github/workflows/backup_daily.yml)
 - [备份文档](./BACKUP.md)
+- [卡任务清理 Runbook](./AI_STUCK_TASK_CLEANUP_RUNBOOK.md)
 
 ---
 
-**最后更新**: 2026-03-09  
+**最后更新**: 2026-03-09（含 AI 0秒验收附录）  
 **状态**: ✅ 已解决

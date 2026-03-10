@@ -1495,16 +1495,18 @@ Object.assign(window.app, {
         const safeHls = this.escapeHtml(hls);
         const safeMp4 = this.escapeHtml(mp4);
         const safeVideo = this.escapeHtml(videoUrl);
+        const srvDur = Math.max(0, Number((p && p.duration) || 0) || 0);
+        const durText = srvDur > 0 ? this.fmtTime(srvDur) : '00:00';
         return `
                 <div class="s-card" data-post-id="${p.id}" data-action="call" data-fn="openPost" data-args="[${p.id}]" data-action-mouseover="call" data-fn-mouseover="showJxPopupById" data-args-mouseover="[${p.id}]" data-pass-el-mouseover="1" data-action-mouseout="call" data-fn-mouseout="hideJxPopup" data-args-mouseout="[]" data-pass-el-mouseout="1">
                     <div class="s-media">
-                        <video class="s-media-video" muted playsinline preload="metadata" poster="${cover2}" data-hls="${safeHls}" data-mp4="${safeMp4}" data-video="${safeVideo}"></video>
+                        <video class="s-media-video" muted playsinline preload="metadata" poster="${cover2}" data-hls="${safeHls}" data-mp4="${safeMp4}" data-video="${safeVideo}" data-duration="${srvDur}"></video>
                         <div class="s-media-controls" data-action="stop" data-stop="1">
                             <div class="s-media-progress" data-action-pointerdown="call" data-fn-pointerdown="searchCardSeek" data-pass-el-pointerdown="1" data-pass-event-pointerdown="1" data-stop="1"><div class="s-media-progress-fill"></div></div>
                             <div class="s-ctrl-row">
                                 <div class="s-ctrl-left">
                                     <div class="s-ctrl-btn s-ctrl-play" data-action="call" data-fn="searchCardTogglePlay" data-pass-el="1" data-stop="1"><i class="fas fa-play"></i></div>
-                                    <div class="s-ctrl-time"><span class="s-ctrl-time-cur">00:00</span><span class="s-ctrl-time-split">/</span><span class="s-ctrl-time-dur">00:00</span></div>
+                                    <div class="s-ctrl-time"><span class="s-ctrl-time-cur">00:00</span><span class="s-ctrl-time-split">/</span><span class="s-ctrl-time-dur">${durText}</span></div>
                                 </div>
                                 <div class="s-ctrl-right">
                                     <div class="s-ctrl-btn s-ctrl-mute" data-action="call" data-fn="searchCardToggleMute" data-pass-el="1" data-stop="1"><i class="fas fa-volume-up"></i></div>
@@ -2150,7 +2152,9 @@ Object.assign(window.app, {
             const syncTime = () => {
                 try {
                     const t = Number(v.currentTime || 0);
-                    const d = Number(v.duration || 0);
+                    const dMeta = Number(v.duration || 0);
+                    const dFallback = Number(v.dataset && v.dataset.duration ? v.dataset.duration : 0) || 0;
+                    const d = (dMeta && Number.isFinite(dMeta)) ? dMeta : dFallback;
                     const curEl = refs.curEl;
                     const durEl = refs.durEl;
                     const curSec = Number.isFinite(t) ? Math.max(0, Math.floor(t)) : 0;

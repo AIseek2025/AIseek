@@ -26,34 +26,14 @@ def upgrade() -> None:
             "CREATE INDEX IF NOT EXISTS idx_ai_moderation_checks_status_created_id ON ai_moderation_checks(status, created_at, id)",
             "CREATE INDEX IF NOT EXISTS idx_media_assets_post_created_id ON media_assets(post_id, created_at, id)",
         ):
-            try:
-                op.execute(stmt)
-            except Exception:
-                pass
+            op.execute(stmt)
         return
 
-    try:
-        op.create_index("idx_ai_jobs_user_created_id", "ai_jobs", ["user_id", "created_at", "id"])
-    except Exception:
-        pass
-    try:
-        op.create_index("idx_ai_job_messages_job_id_id", "ai_job_messages", ["job_id", "id"])
-    except Exception:
-        pass
-    try:
-        op.create_index("idx_ai_job_draft_versions_job_id_id", "ai_job_draft_versions", ["job_id", "id"])
-    except Exception:
-        pass
-    try:
-        op.create_index("idx_ai_moderation_checks_status_created_id", "ai_moderation_checks", ["status", "created_at", "id"])
-    except Exception:
-        pass
-    try:
-        op.create_index("idx_media_assets_post_created_id", "media_assets", ["post_id", "created_at", "id"])
-    except Exception:
-        pass
-
-
+    op.create_index("idx_ai_jobs_user_created_id", "ai_jobs", ["user_id", "created_at", "id"])
+    op.create_index("idx_ai_job_messages_job_id_id", "ai_job_messages", ["job_id", "id"])
+    op.create_index("idx_ai_job_draft_versions_job_id_id", "ai_job_draft_versions", ["job_id", "id"])
+    op.create_index("idx_ai_moderation_checks_status_created_id", "ai_moderation_checks", ["status", "created_at", "id"])
+    op.create_index("idx_media_assets_post_created_id", "media_assets", ["post_id", "created_at", "id"])
 def downgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
@@ -65,10 +45,7 @@ def downgrade() -> None:
             "DROP INDEX IF EXISTS idx_ai_job_messages_job_id_id",
             "DROP INDEX IF EXISTS idx_ai_jobs_user_created_id",
         ):
-            try:
-                op.execute(stmt)
-            except Exception:
-                pass
+            op.execute(stmt)
         return
 
     for name, table in (
@@ -78,8 +55,4 @@ def downgrade() -> None:
         ("idx_ai_job_messages_job_id_id", "ai_job_messages"),
         ("idx_ai_jobs_user_created_id", "ai_jobs"),
     ):
-        try:
-            op.drop_index(name, table_name=table)
-        except Exception:
-            pass
-
+        op.drop_index(name, table_name=table)

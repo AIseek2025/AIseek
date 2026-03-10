@@ -1118,7 +1118,9 @@ Object.assign(window.app, {
             i.className = (video.muted || video.volume === 0) ? 'fas fa-volume-mute' : 'fas fa-volume-up';
         };
         const sync = () => {
-            const dur = video.duration || 0;
+            const metaDur = Number(video.duration || 0);
+            const fallbackDur = Number(video.dataset && video.dataset.duration ? video.dataset.duration : 0) || 0;
+            const dur = (metaDur && Number.isFinite(metaDur)) ? metaDur : fallbackDur;
             const cur = video.currentTime || 0;
             if (tCur) tCur.textContent = this.fmtTime(cur);
             if (tDur) tDur.textContent = this.fmtTime(dur);
@@ -1247,7 +1249,9 @@ Object.assign(window.app, {
             i.className = (video.muted || video.volume === 0) ? 'fas fa-volume-mute' : 'fas fa-volume-up';
         };
         const sync = () => {
-            const dur = video.duration || 0;
+            const metaDur = Number(video.duration || 0);
+            const fallbackDur = Number(video.dataset && video.dataset.duration ? video.dataset.duration : 0) || 0;
+            const dur = (metaDur && Number.isFinite(metaDur)) ? metaDur : fallbackDur;
             const cur = video.currentTime || 0;
             if (tCur) tCur.textContent = this.fmtTime(cur);
             if (tDur) tDur.textContent = this.fmtTime(dur);
@@ -1691,15 +1695,17 @@ Object.assign(window.app, {
                 const srcs = this.resolveVideoSources(post);
                 const hls = srcs.hls_url || '';
                 const mp4 = srcs.mp4_url || '';
+                const srvDur = Math.max(0, Number(post && post.duration) || 0);
+                const durText = srvDur > 0 ? this.fmtTime(srvDur) : '00:00';
                 const media = isV
                     ? `
-                        <video data-hls="${hls}" data-mp4="${mp4}" poster="${poster}" muted loop playsinline webkit-playsinline preload="metadata"></video>
+                        <video data-hls="${hls}" data-mp4="${mp4}" data-duration="${srvDur}" poster="${poster}" muted loop playsinline webkit-playsinline preload="metadata"></video>
                         <div class="jx-mini-controls" data-action="stop" data-stop="1">
                             <div class="jx-mini-progress" data-role="progress"><div class="jx-mini-filled"></div></div>
                             <div class="jx-mini-row">
                                 <div class="jx-mini-left">
                                     <div class="jx-mini-btn" data-role="play"><i class="fas fa-pause"></i></div>
-                                    <div class="jx-mini-time"><span data-role="current">00:00</span> / <span data-role="duration">00:00</span></div>
+                                    <div class="jx-mini-time"><span data-role="current">00:00</span> / <span data-role="duration">${durText}</span></div>
                                 </div>
                                 <div class="jx-mini-right">
                                     <div class="jx-mini-btn" data-role="mute"><i class="fas fa-volume-mute"></i></div>
@@ -1736,8 +1742,10 @@ Object.assign(window.app, {
                 const hls = srcs.hls_url || '';
                 const mp4 = srcs.mp4_url || '';
                 const poster = featured.cover_url || `/api/v1/media/post-thumb/${encodeURIComponent(String(featured.id))}?v=${Date.now()}`;
+                const srvDur = Math.max(0, Number(featured && featured.duration) || 0);
+                const durText = srvDur > 0 ? this.fmtTime(srvDur) : '00:00';
                 const media = isVideo
-                    ? `<video data-hls="${hls}" data-mp4="${mp4}" poster="${poster}" muted loop playsinline webkit-playsinline preload="metadata"></video>`
+                    ? `<video data-hls="${hls}" data-mp4="${mp4}" data-duration="${srvDur}" poster="${poster}" muted loop playsinline webkit-playsinline preload="metadata"></video>`
                     : `<img src="${poster || featured.images?.[0] || featured.video_url}">`;
                 const title = featured.content_text || featured.title || '';
                 const author = featured.user_nickname || ('用户' + featured.user_id);
@@ -1749,7 +1757,7 @@ Object.assign(window.app, {
                         <div class="jx-controls-row">
                             <div class="jx-controls-left">
                                 <div class="jx-ctrl-btn" data-role="play"><i class="fas fa-pause"></i></div>
-                                <div class="jx-time"><span data-role="current">00:00</span> / <span data-role="duration">00:00</span></div>
+                                <div class="jx-time"><span data-role="current">00:00</span> / <span data-role="duration">${durText}</span></div>
                             </div>
                             <div class="jx-controls-right">
                                 <div class="jx-vol-wrap">
@@ -1971,15 +1979,17 @@ Object.assign(window.app, {
                     const srcs = this.resolveVideoSources(post);
                     const hls = srcs.hls_url || '';
                     const mp4 = srcs.mp4_url || '';
+                    const srvDur = Math.max(0, Number(post && post.duration) || 0);
+                    const durText = srvDur > 0 ? this.fmtTime(srvDur) : '00:00';
                     const media = isV
                         ? `
-                            <video data-hls="${hls}" data-mp4="${mp4}" poster="${poster}" muted loop playsinline webkit-playsinline preload="metadata"></video>
+                            <video data-hls="${hls}" data-mp4="${mp4}" data-duration="${srvDur}" poster="${poster}" muted loop playsinline webkit-playsinline preload="metadata"></video>
                             <div class="jx-mini-controls" data-action="stop" data-stop="1">
                                 <div class="jx-mini-progress" data-role="progress"><div class="jx-mini-filled"></div></div>
                                 <div class="jx-mini-row">
                                     <div class="jx-mini-left">
                                         <div class="jx-mini-btn" data-role="play"><i class="fas fa-pause"></i></div>
-                                        <div class="jx-mini-time"><span data-role="current">00:00</span> / <span data-role="duration">00:00</span></div>
+                                        <div class="jx-mini-time"><span data-role="current">00:00</span> / <span data-role="duration">${durText}</span></div>
                                     </div>
                                     <div class="jx-mini-right">
                                         <div class="jx-mini-btn" data-role="mute"><i class="fas fa-volume-mute"></i></div>

@@ -27,10 +27,7 @@ def upgrade() -> None:
             "CREATE INDEX IF NOT EXISTS idx_ai_jobs_dispatch_attempts ON ai_jobs(dispatch_attempts)",
             "CREATE INDEX IF NOT EXISTS idx_ai_jobs_next_dispatch_at ON ai_jobs(next_dispatch_at)",
         ):
-            try:
-                op.execute(stmt)
-            except Exception:
-                pass
+            op.execute(stmt)
         return
 
     for name, col in (
@@ -38,33 +35,17 @@ def upgrade() -> None:
         ("last_dispatch_at", sa.Column("last_dispatch_at", sa.DateTime(timezone=True), nullable=True)),
         ("next_dispatch_at", sa.Column("next_dispatch_at", sa.DateTime(timezone=True), nullable=True)),
     ):
-        try:
-            op.add_column("ai_jobs", col)
-        except Exception:
-            pass
-
+        op.add_column("ai_jobs", col)
     for idx, cols in (
         ("idx_ai_jobs_dispatch_attempts", ["dispatch_attempts"]),
         ("idx_ai_jobs_next_dispatch_at", ["next_dispatch_at"]),
     ):
-        try:
-            op.create_index(idx, "ai_jobs", cols)
-        except Exception:
-            pass
-
-
+        op.create_index(idx, "ai_jobs", cols)
 def downgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
     if dialect != "sqlite":
         for idx in ("idx_ai_jobs_next_dispatch_at", "idx_ai_jobs_dispatch_attempts"):
-            try:
-                op.drop_index(idx, table_name="ai_jobs")
-            except Exception:
-                pass
+            op.drop_index(idx, table_name="ai_jobs")
         for col in ("next_dispatch_at", "last_dispatch_at", "dispatch_attempts"):
-            try:
-                op.drop_column("ai_jobs", col)
-            except Exception:
-                pass
-
+            op.drop_column("ai_jobs", col)

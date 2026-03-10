@@ -171,5 +171,8 @@ def apply_async_with_context(
         if headers:
             return task.apply_async(args=args or [], kwargs=kwargs or {}, headers=headers, **opts)
         return task.apply_async(args=args or [], kwargs=kwargs or {}, **opts)
-    except Exception:
+    except Exception as e:
+        print(f"ERROR in apply_async_with_context: {e}")
+        import traceback
+        traceback.print_exc()
         return None

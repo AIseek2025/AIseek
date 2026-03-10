@@ -27,40 +27,26 @@ def upgrade() -> None:
             "ALTER TABLE posts ADD COLUMN error_message TEXT",
             "ALTER TABLE posts ADD COLUMN status_updated_at DATETIME",
         ):
-            try:
-                op.execute(sql)
-            except Exception:
-                pass
-        try:
-            op.execute("CREATE INDEX IF NOT EXISTS idx_posts_source_key ON posts(source_key)")
-        except Exception:
-            pass
+            op.execute(sql)
+        op.execute("CREATE INDEX IF NOT EXISTS idx_posts_source_key ON posts(source_key)")
         return
 
-    try:
+    # Postgres: Use inspector to check for columns
+    inspector = sa.inspect(bind)
+    columns = [c['name'] for c in inspector.get_columns('posts')]
+    
+    if 'source_key' not in columns:
         op.add_column("posts", sa.Column("source_key", sa.String(), nullable=True))
-    except Exception:
-        pass
-    try:
+    if 'source_url' not in columns:
         op.add_column("posts", sa.Column("source_url", sa.String(), nullable=True))
-    except Exception:
-        pass
-    try:
+    if 'processed_url' not in columns:
         op.add_column("posts", sa.Column("processed_url", sa.String(), nullable=True))
-    except Exception:
-        pass
-    try:
+    if 'error_message' not in columns:
         op.add_column("posts", sa.Column("error_message", sa.Text(), nullable=True))
-    except Exception:
-        pass
-    try:
+    if 'status_updated_at' not in columns:
         op.add_column("posts", sa.Column("status_updated_at", sa.DateTime(timezone=True), nullable=True))
-    except Exception:
-        pass
-    try:
-        op.create_index("idx_posts_source_key", "posts", ["source_key"])
-    except Exception:
-        pass
+
+    op.execute("CREATE INDEX IF NOT EXISTS idx_posts_source_key ON posts(source_key)")
 
 
 def downgrade() -> None:
@@ -68,19 +54,9 @@ def downgrade() -> None:
     dialect = bind.dialect.name
 
     if dialect == "sqlite":
-        try:
-            op.execute("DROP INDEX IF EXISTS idx_posts_source_key")
-        except Exception:
-            pass
+        op.execute("DROP INDEX IF EXISTS idx_posts_source_key")
         return
 
-    try:
-        op.drop_index("idx_posts_source_key", table_name="posts")
-    except Exception:
-        pass
+    op.drop_index("idx_posts_source_key", table_name="posts")
     for col in ("status_updated_at", "error_message", "processed_url", "source_url", "source_key"):
-        try:
-            op.drop_column("posts", col)
-        except Exception:
-            pass
-
+        op.drop_column("posts", col)

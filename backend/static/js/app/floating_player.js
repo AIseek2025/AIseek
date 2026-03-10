@@ -459,7 +459,9 @@ Object.assign(window.app, {
         } catch (_) {
         }
         video.addEventListener('timeupdate', () => {
-            const d = Number(video.duration || 0);
+            const metaDur = Number(video.duration || 0);
+            const fallbackDur = Number(video.dataset && video.dataset.duration ? video.dataset.duration : 0) || 0;
+            const d = (metaDur && Number.isFinite(metaDur)) ? metaDur : fallbackDur;
             const t = Number(video.currentTime || 0);
             if (!d || !Number.isFinite(d) || !Number.isFinite(t)) return;
             progressFill.style.width = `${Math.max(0, Math.min(100, (t / d) * 100))}%`;
@@ -473,7 +475,9 @@ Object.assign(window.app, {
         });
         video.addEventListener('loadedmetadata', () => {
             try {
-                const d = Number(video.duration || 0);
+                const metaDur = Number(video.duration || 0);
+                const fallbackDur = Number(video.dataset && video.dataset.duration ? video.dataset.duration : 0) || 0;
+                const d = (metaDur && Number.isFinite(metaDur)) ? metaDur : fallbackDur;
                 const b = document.getElementById('floating_time_dur');
                 if (b) b.innerText = (d && Number.isFinite(d)) ? this.fmtTime(d) : '00:00';
             } catch (_) {
@@ -519,6 +523,12 @@ Object.assign(window.app, {
         if (!mp4Url && !hlsFallback) return;
 
         const curTime = srcVideo ? Number(srcVideo.currentTime || 0) : 0;
+        const fallbackDur = Math.max(
+            0,
+            Number((post && post.duration) || 0) ||
+            Number((srcVideo && srcVideo.dataset && srcVideo.dataset.duration) || 0) ||
+            0
+        );
         const wasPaused = opts && opts.forcePlay ? false : (srcVideo ? !!srcVideo.paused : false);
 
         this.state.floatingPostId = pid;
@@ -691,6 +701,12 @@ Object.assign(window.app, {
         try {
             if (post && post.cover_url) video.poster = String(post.cover_url);
             else video.removeAttribute('poster');
+        } catch (_) {
+        }
+        try {
+            if (fallbackDur > 0) video.dataset.duration = String(fallbackDur);
+            const b = document.getElementById('floating_time_dur');
+            if (b) b.innerText = fallbackDur > 0 ? this.fmtTime(fallbackDur) : '00:00';
         } catch (_) {
         }
 

@@ -159,34 +159,30 @@ def upgrade() -> None:
             ")"
         )
     else:
-        try:
-            op.create_table(
-                "users",
-                sa.Column("id", sa.Integer(), primary_key=True),
-                sa.Column("username", sa.String(), nullable=False, unique=True, index=True),
-                sa.Column("email", sa.String(), unique=True, nullable=True, index=True),
-                sa.Column("phone", sa.String(), unique=True, nullable=True, index=True),
-                sa.Column("password_hash", sa.String(), nullable=False),
-                sa.Column("nickname", sa.String(), nullable=True, index=True),
-                sa.Column("avatar", sa.String(), nullable=True),
-                sa.Column("background", sa.String(), nullable=True),
-                sa.Column("bio", sa.String(), nullable=True),
-                sa.Column("gender", sa.String(), nullable=True),
-                sa.Column("birthday", sa.String(), nullable=True),
-                sa.Column("location", sa.String(), nullable=True),
-                sa.Column("aiseek_id", sa.String(), unique=True, nullable=True, index=True),
-                sa.Column("followers_count", sa.Integer(), server_default="0"),
-                sa.Column("following_count", sa.Integer(), server_default="0"),
-                sa.Column("likes_received_count", sa.Integer(), server_default="0"),
-                sa.Column("is_active", sa.Boolean(), server_default=sa.text("true")),
-                sa.Column("is_superuser", sa.Boolean(), server_default=sa.text("false")),
-                sa.Column("settings", sa.JSON(), nullable=True),
-                sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP")),
-                sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
-            )
-        except Exception:
-            pass
-
+        op.create_table(
+            "users",
+            sa.Column("id", sa.Integer(), primary_key=True),
+            sa.Column("username", sa.String(), nullable=False, unique=True, index=True),
+            sa.Column("email", sa.String(), unique=True, nullable=True, index=True),
+            sa.Column("phone", sa.String(), unique=True, nullable=True, index=True),
+            sa.Column("password_hash", sa.String(), nullable=False),
+            sa.Column("nickname", sa.String(), nullable=True, index=True),
+            sa.Column("avatar", sa.String(), nullable=True),
+            sa.Column("background", sa.String(), nullable=True),
+            sa.Column("bio", sa.String(), nullable=True),
+            sa.Column("gender", sa.String(), nullable=True),
+            sa.Column("birthday", sa.String(), nullable=True),
+            sa.Column("location", sa.String(), nullable=True),
+            sa.Column("aiseek_id", sa.String(), unique=True, nullable=True, index=True),
+            sa.Column("followers_count", sa.Integer(), server_default="0"),
+            sa.Column("following_count", sa.Integer(), server_default="0"),
+            sa.Column("likes_received_count", sa.Integer(), server_default="0"),
+            sa.Column("is_active", sa.Boolean(), server_default=sa.text("true")),
+            sa.Column("is_superuser", sa.Boolean(), server_default=sa.text("false")),
+            sa.Column("settings", sa.JSON(), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        )
         for fn in (
             _create_core_postgres_posts,
             _create_core_postgres_comments,
@@ -199,11 +195,7 @@ def upgrade() -> None:
             _create_core_postgres_user_personas,
             _create_core_postgres_danmaku,
         ):
-            try:
-                fn()
-            except Exception:
-                pass
-
+            fn()
     if dialect == "sqlite":
         op.execute(
             "CREATE TABLE IF NOT EXISTS ai_jobs ("

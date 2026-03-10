@@ -30,20 +30,8 @@ def upgrade() -> None:
         ("idx_ai_job_msg_user", ["user_id"]),
         ("idx_ai_job_msg_role", ["role"]),
     ):
-        try:
-            op.create_index(idx, "ai_job_messages", cols)
-        except Exception:
-            pass
-
-
+        op.create_index(idx, "ai_job_messages", cols)
 def downgrade() -> None:
     for idx in ("idx_ai_job_msg_role", "idx_ai_job_msg_user", "idx_ai_job_msg_job"):
-        try:
-            op.drop_index(idx, table_name="ai_job_messages")
-        except Exception:
-            pass
-    try:
-        op.drop_table("ai_job_messages")
-    except Exception:
-        pass
-
+        op.drop_index(idx, table_name="ai_job_messages")
+    op.drop_table("ai_job_messages")

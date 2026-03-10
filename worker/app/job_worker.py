@@ -67,23 +67,25 @@ async def process_job(job_data: dict):
     post_id = job_data.get("post_id")
     draft_in = job_data.get("draft_json")
 
-    job_logger = JobLogger(logger, job_id)
-    job_logger.start(queue_size=job_queue.get_status(job_id))
-
-    db.update_job(job_id, status="processing")
-
+    # Initialize variables early to avoid UnboundLocalError in finally block
     voice_path = None
     video_path = None
     video_url = None
     image_paths = []
     uploaded_images = []
     bg_tmp_files = []
+    subtitle_files = []
     subtitle_zh_segments = []
     subtitle_times = []
     subtitle_en_segments = []
     cover_image_path = None
     cover_trace = None
     cover_audit = None
+
+    job_logger = JobLogger(logger, job_id)
+    job_logger.start(queue_size=job_queue.get_status(job_id))
+
+    db.update_job(job_id, status="processing")
 
     try:
         await callback_web(job_data, status="processing", stage="start", progress=1, stage_message="任务开始")

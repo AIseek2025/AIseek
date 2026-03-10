@@ -29,61 +29,23 @@ def upgrade() -> None:
         sa.Column("video_height", sa.Integer(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP")),
     )
-    try:
-        op.create_index("idx_media_assets_post_id", "media_assets", ["post_id"])
-    except Exception:
-        pass
-    try:
-        op.create_index("idx_media_assets_version", "media_assets", ["version"])
-    except Exception:
-        pass
-
+    op.create_index("idx_media_assets_post_id", "media_assets", ["post_id"])
+    op.create_index("idx_media_assets_version", "media_assets", ["version"])
     bind = op.get_bind()
     dialect = bind.dialect.name
     if dialect == "sqlite":
-        try:
-            op.execute("ALTER TABLE posts ADD COLUMN active_media_asset_id INTEGER")
-        except Exception:
-            pass
-        try:
-            op.execute("CREATE INDEX IF NOT EXISTS idx_posts_active_media_asset_id ON posts(active_media_asset_id)")
-        except Exception:
-            pass
+        op.execute("ALTER TABLE posts ADD COLUMN active_media_asset_id INTEGER")
+        op.execute("CREATE INDEX IF NOT EXISTS idx_posts_active_media_asset_id ON posts(active_media_asset_id)")
         return
 
-    try:
-        op.add_column("posts", sa.Column("active_media_asset_id", sa.Integer(), sa.ForeignKey("media_assets.id"), nullable=True))
-    except Exception:
-        pass
-    try:
-        op.create_index("idx_posts_active_media_asset_id", "posts", ["active_media_asset_id"])
-    except Exception:
-        pass
-
-
+    op.add_column("posts", sa.Column("active_media_asset_id", sa.Integer(), sa.ForeignKey("media_assets.id"), nullable=True))
+    op.create_index("idx_posts_active_media_asset_id", "posts", ["active_media_asset_id"])
 def downgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
     if dialect != "sqlite":
-        try:
-            op.drop_index("idx_posts_active_media_asset_id", table_name="posts")
-        except Exception:
-            pass
-        try:
-            op.drop_column("posts", "active_media_asset_id")
-        except Exception:
-            pass
-
-    try:
-        op.drop_index("idx_media_assets_version", table_name="media_assets")
-    except Exception:
-        pass
-    try:
-        op.drop_index("idx_media_assets_post_id", table_name="media_assets")
-    except Exception:
-        pass
-    try:
-        op.drop_table("media_assets")
-    except Exception:
-        pass
-
+        op.drop_index("idx_posts_active_media_asset_id", table_name="posts")
+        op.drop_column("posts", "active_media_asset_id")
+    op.drop_index("idx_media_assets_version", table_name="media_assets")
+    op.drop_index("idx_media_assets_post_id", table_name="media_assets")
+    op.drop_table("media_assets")

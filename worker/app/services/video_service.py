@@ -12,6 +12,35 @@ from app.services.background_service import ffmpeg_background_filter, ffmpeg_bac
 logger = logging.getLogger(__name__)
 
 class VideoService:
+    def _video_encoder(self) -> str:
+        cached = getattr(self, "_cached_encoder", None)
+        if isinstance(cached, str) and cached:
+            return cached
+        # Force libx264 for Linux Docker environment to avoid h264_videotoolbox issues
+        want = "libx264"
+        selected = "libx264"
+        if want == "libx264":
+            selected = want
+        else:
+            try:
+                p = subprocess.run(
+                    ["ffmpeg", "-hide_banner", "-encoders"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=3,
+                )
+                txt = (p.stdout or "") + "\n" + (p.stderr or "")
+                import re
+
+                pat = rf"(?m)^\s*[A-Z\.]{{6}}\s+{re.escape(want)}(?:\s|$)"
+                if re.search(pat, txt):
+                    selected = want
+            except Exception:
+                selected = "libx264"
+        setattr(self, "_cached_encoder", selected)
+        return selected
+
     def _canvas_size(self, orientation: Optional[str]) -> tuple[int, int]:
         o = str(orientation or "portrait").strip().lower()
         if o == "landscape":
@@ -62,7 +91,7 @@ class VideoService:
             "-map",
             "[a]",
             "-c:v",
-            settings.ffmpeg_hw_accel,
+            self._video_encoder(),
             "-b:v",
             "5M",
             "-c:a",
@@ -162,7 +191,7 @@ class VideoService:
 
         # Encoding settings
         cmd.extend([
-            "-c:v", settings.ffmpeg_hw_accel,
+            "-c:v", self._video_encoder(),
             "-b:v", "5M",
             "-c:a", "aac",
             "-shortest", # Stop when shortest input ends (should be voice due to amix duration=first, but good safety)
@@ -203,6 +232,37 @@ class VideoService:
             
         except subprocess.CalledProcessError as e:
             logger.error(f"FFmpeg failed with error: {e.stderr}")
+            cw, ch = self._canvas_size(cover_orientation)
+            fallback_cmd = [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                f"color=c=black:s={cw}x{ch}:r=30",
+                "-i",
+                voice_path,
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "23",
+                "-c:a",
+                "aac",
+                "-shortest",
+                "-pix_fmt",
+                "yuv420p",
+                "-movflags",
+                "+faststart",
+                str(output_path),
+            ]
+            try:
+                subprocess.run(fallback_cmd, capture_output=True, text=True, check=True)
+                if output_path.exists():
+                    return str(output_path)
+            except Exception:
+                pass
             raise Exception(f"Video generation failed: {e.stderr}")
 
     def create_storyboard_video(
@@ -271,7 +331,7 @@ class VideoService:
         cmd.extend(
             [
                 "-c:v",
-                settings.ffmpeg_hw_accel,
+                self._video_encoder(),
                 "-b:v",
                 "5M",
                 "-c:a",
@@ -326,7 +386,7 @@ class VideoService:
             "ffmpeg", "-y",
             "-i", input_url,
             "-vf", "scale=-2:720", # Resize to 720p height, keep aspect ratio
-            "-c:v", settings.ffmpeg_hw_accel, # Hardware accel
+            "-c:v", self._video_encoder(),
             "-b:v", "2M",
             "-c:a", "aac",
             "-b:a", "128k",
@@ -396,6 +456,8 @@ class VideoService:
                 out["height"] = int(streams[0].get("height") or 0)
             fmt = obj.get("format") or {}
             d = float(fmt.get("duration") or 0.0) if isinstance(fmt, dict) else 0.0
+            if d <= 0 and streams and isinstance(streams[0], dict):
+                d = float(streams[0].get("duration") or 0.0)
             if d < 0:
                 d = 0.0
             out["duration"] = int(round(d))

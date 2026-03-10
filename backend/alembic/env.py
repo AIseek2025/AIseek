@@ -11,17 +11,23 @@ from app.models import all_models  # noqa: F401
 
 config = context.config
 
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Skip fileConfig to avoid logging configuration issues
+# if config.config_file_name is not None:
+#     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
 
 def get_url() -> str:
+    # Try environment variables first (from docker-compose)
+    url = os.getenv("DATABASE_URL")
+    if url:
+        return url
     url = os.getenv("ALEMBIC_DATABASE_URL")
     if url:
         return url
-    return config.get_main_option("sqlalchemy.url")
+    # Fallback to alembic.ini config
+    return config.get_main_option("sqlalchemy.url") or "postgresql://postgres:postgres@db:5432/aiseek"
 
 
 def run_migrations_offline() -> None:

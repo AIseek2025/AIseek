@@ -97,6 +97,7 @@ services:
     command: celery -A app.worker.celery_app worker -Q ai,transcode --loglevel=info --concurrency=4 --prefetch-multiplier=1 --max-tasks-per-child=20
     volumes:
       - ./worker:/app
+      - ./backend:/backend
       # Map hardware acceleration devices if needed (Linux)
       # For Mac M3 Pro, we run worker locally outside Docker for HW accel usually, 
       # but for architecture design we show it here.

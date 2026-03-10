@@ -1,3 +1,4 @@
+# Environments
 .env
 .env.local
 .env.*.local
@@ -5,31 +6,45 @@ worker/.env
 worker/.env.local
 backend/.env
 backend/.env.local
+
+# Database
 *.db
+*.db-shm
+*.db-wal
+
+# Python
 __pycache__/
 .pytest_cache/
 .venv/
-.DS_Store
+worker/venv/
+backend/venv/
+
+# Logs
 *.log
 logs/
-.pids
+backend/logs/
+backend/backend.log
+
+# Trae
 .trae/
-backups/*.tar.gz
-backups/*.sha256
-backups/*.manifest.txt
-backups/*.filelist.txt
-backups/*.changes.txt
-backups/*.README.md
+
+# OS
+.DS_Store
+
+# Backups and Releases
+backups/
+*.tar.gz
+*.tgz
+*.zip
+
+# Generated Media / Cache
 tmp_*.jpg
 tmp_*.mp3
-sql_app.db-shm
-sql_app.db-wal
 media/
 worker/outputs/
 worker/data/placeholder_cache/
-worker/venv/
-backend/venv/
-backend/logs/
-backend/backend.log
 backend/static/uploads/
 backend/static/worker_media/
+
+# Optional: Ignore large assets if not needed in repo
+# worker/assets/bgm/

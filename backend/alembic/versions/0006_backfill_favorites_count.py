@@ -15,15 +15,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    try:
-        op.execute(
-            "UPDATE posts SET favorites_count = ("
-            "SELECT COUNT(1) FROM interactions i WHERE i.post_id = posts.id AND i.type = 'favorite'"
-            ")"
-        )
-    except Exception:
-        pass
-
-
+    op.execute(
+        "UPDATE posts SET favorites_count = ("
+        "SELECT COUNT(1) FROM interactions i WHERE i.post_id = posts.id AND i.type = 'favorite'"
+        ")"
+    )
 def downgrade() -> None:
     pass

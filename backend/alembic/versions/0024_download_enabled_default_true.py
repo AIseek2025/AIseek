@@ -15,12 +15,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    try:
+    bind = op.get_bind()
+    dialect = bind.dialect.name
+    if dialect == "sqlite":
         op.execute("UPDATE posts SET download_enabled=1 WHERE download_enabled IS NULL OR download_enabled=0")
-    except Exception:
-        pass
-
-
+    else:
+        op.execute("UPDATE posts SET download_enabled=TRUE WHERE download_enabled IS NULL OR download_enabled=FALSE")
 def downgrade() -> None:
     return
 

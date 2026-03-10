@@ -16,34 +16,24 @@ depends_on = None
 
 
 def upgrade() -> None:
-    try:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = [c['name'] for c in inspector.get_columns('posts')]
+    if 'creation_mode' not in columns:
         op.add_column("posts", sa.Column("creation_mode", sa.String(length=16), nullable=True, server_default="ai"))
-    except Exception:
-        return
-    try:
-        op.execute(
-            "UPDATE posts SET creation_mode='manual' "
-            "WHERE (source_key LIKE 'uploads/%' OR source_url LIKE '%/uploads/%' OR cover_url LIKE '%/uploads/%' OR images LIKE '%/uploads/%')"
-        )
-    except Exception:
-        pass
-    try:
-        op.execute("UPDATE posts SET creation_mode='ai' WHERE creation_mode IS NULL OR creation_mode=''")
-    except Exception:
-        pass
-    try:
-        op.create_index("ix_posts_creation_mode", "posts", ["creation_mode"])
-    except Exception:
-        pass
+
+    # Execute updates without try-except, they should be safe if table exists
+    # Postgres requires casting JSON to text for LIKE operator
+    op.execute(
+        "UPDATE posts SET creation_mode='manual' "
+        "WHERE (source_key LIKE 'uploads/%' OR source_url LIKE '%/uploads/%' OR cover_url LIKE '%/uploads/%' OR CAST(images AS TEXT) LIKE '%/uploads/%')"
+    )
+    op.execute("UPDATE posts SET creation_mode='ai' WHERE creation_mode IS NULL OR creation_mode=''")
+
+    # Create index if not exists
+    op.execute("CREATE INDEX IF NOT EXISTS ix_posts_creation_mode ON posts(creation_mode)")
 
 
 def downgrade() -> None:
-    try:
-        op.drop_index("ix_posts_creation_mode", table_name="posts")
-    except Exception:
-        pass
-    try:
-        op.drop_column("posts", "creation_mode")
-    except Exception:
-        pass
-
+    op.drop_index("ix_posts_creation_mode", table_name="posts")
+    op.drop_column("posts", "creation_mode")
