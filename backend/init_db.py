@@ -35,18 +35,17 @@ def init_database():
     
     # 创建关注表
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS follow (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+    CREATE TABLE IF NOT EXISTS follows (
         follower_id INTEGER NOT NULL,
         following_id INTEGER NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(follower_id, following_id)
+        PRIMARY KEY (follower_id, following_id)
     )
     ''')
     
     # 创建好友请求表
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS friend_request (
+    CREATE TABLE IF NOT EXISTS friend_requests (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sender_id INTEGER NOT NULL,
         receiver_id INTEGER NOT NULL,
@@ -77,6 +76,102 @@ def init_database():
     )
     ''')
     
+    # 创建互动表 (likes, favorites, etc.)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS interactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        post_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # 创建消息表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender_id INTEGER NOT NULL,
+        receiver_id INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # 创建分类表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        sort_order INTEGER DEFAULT 0,
+        is_active INTEGER DEFAULT 1
+    )
+    ''')
+    
+    # 创建评论表
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        post_id INTEGER,
+        parent_id INTEGER,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # === 创建关键索引 (修复超时问题) ===
+    # interactions 表索引 - 用于 decorate_flags 查询
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_interactions_user_post_type 
+    ON interactions (user_id, post_id, type)
+    ''')
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_interactions_user_id 
+    ON interactions (user_id)
+    ''')
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_interactions_post_id 
+    ON interactions (post_id)
+    ''')
+    
+    # follows 表索引
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_follows_follower_id 
+    ON follows (follower_id)
+    ''')
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_follows_following_id 
+    ON follows (following_id)
+    ''')
+    
+    # posts 表索引
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_posts_user_id 
+    ON posts (user_id)
+    ''')
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_posts_status 
+    ON posts (status)
+    ''')
+    
+    # messages 表索引
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_messages_sender_receiver 
+    ON messages (sender_id, receiver_id)
+    ''')
+    
+    # comments 表索引
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_comments_post_id 
+    ON comments (post_id)
+    ''')
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS ix_comments_user_id 
+    ON comments (user_id)
+    ''')
+    
     # 创建测试用户
     test_users = [
         ('testuser', 'test123_hashed', 'test@example.com', '测试用户', 'U001'),
@@ -94,6 +189,27 @@ def init_database():
             print(f'✅ 创建用户：{username} (密码：{pwd_hash.replace("_hashed", "")})')
         except sqlite3.IntegrityError:
             print(f'⚠️  用户已存在：{username}')
+    
+    # 插入初始分类数据
+    categories = ['AI', 'Programming', 'Ecommerce', 'Marketing', 'Multimodal', 'Robots']
+    for i, cat in enumerate(categories):
+        try:
+            cursor.execute('''
+            INSERT INTO categories (name, sort_order, is_active)
+            VALUES (?, ?, ?)
+            ''', (cat, i, 1))
+        except sqlite3.IntegrityError:
+            pass
+    
+    # 插入一个测试帖子 (用于 smoke test)
+    try:
+        cursor.execute('''
+        INSERT INTO posts (user_id, title, summary, content, post_type, category, status, likes_count, comments_count)
+        VALUES (1, 'Test Post', 'A test post for CI', 'Test content', 'video', 'AI', 'done', 0, 0)
+        ''')
+        print('✅ 创建测试帖子：id=1')
+    except sqlite3.IntegrityError:
+        pass
     
     conn.commit()
     conn.close()
