@@ -36,16 +36,30 @@ class StorageService:
                 
                 p = Path(__file__).resolve()
                 repo_root = p.parents[3]
-                # Check for Docker structure first
-                if len(p.parents) > 1 and (p.parents[1] / "backend").exists():
-                    repo_root = p.parents[1]
-                elif len(p.parents) > 2 and (p.parents[2] / "backend").exists():
-                    repo_root = p.parents[2]
                 
-                out_root = repo_root / "backend" / "static" / "worker_media"
+                # Explicitly check for Docker bind mount location first
+                if Path("/app/backend/static").exists():
+                    out_root = Path("/app/backend/static/worker_media")
+                else:
+                    # Check for Docker structure relative to this file
+                    if len(p.parents) > 1 and (p.parents[1] / "backend").exists():
+                        repo_root = p.parents[1]
+                    elif len(p.parents) > 2 and (p.parents[2] / "backend").exists():
+                        repo_root = p.parents[2]
+                    out_root = repo_root / "backend" / "static" / "worker_media"
+
+                logger.info(f"Local upload target: {out_root} (rel={rel})")
+                
                 dst = out_root / rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
+                
+                # Ensure permissions are correct for Nginx (readable by others)
+                try:
+                    os.chmod(dst, 0o644)
+                except Exception:
+                    pass
+                    
                 return f"/static/worker_media/{rel}"
             except Exception:
                 logger.warning("R2 is not configured. Skipping upload.")
