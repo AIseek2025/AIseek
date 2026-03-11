@@ -518,17 +518,25 @@ async def process_job(job_data: dict):
                 ct = "image/webp" if cover_path.lower().endswith(".webp") else "image/png" if cover_path.lower().endswith(".png") else "image/jpeg"
                 ext = ".webp" if ct == "image/webp" else ".png" if ct == "image/png" else ".jpg"
                 cover_url = storage_service.upload_file(cover_path, f"covers/{job_id}/{uuid.uuid4()}{ext}", content_type=ct, cache_control="public, max-age=31536000")
-        except Exception:
+                logger.info(f"Cover uploaded successfully: {cover_url}")
+        except Exception as e:
+            logger.error(f"Cover generation/upload failed: {e}")
             cover_url = None
 
         hls_root = None
         hls_url = None
         try:
+            logger.info(f"Starting HLS packaging for job {job_id}")
             master = video_service.package_hls(job_id, video_path)
             if master and os.path.exists(master):
                 hls_root = str(Path(master).parent)
+                logger.info(f"HLS package created at {hls_root}, uploading...")
                 hls_url = storage_service.upload_directory(hls_root, f"hls/{job_id}/{uuid.uuid4()}")
-        except Exception:
+                logger.info(f"HLS uploaded successfully: {hls_url}")
+            else:
+                logger.error(f"HLS master file not found at {master}")
+        except Exception as e:
+            logger.error(f"HLS packaging failed: {e}")
             hls_url = None
         if hls_url:
             video_url = hls_url
