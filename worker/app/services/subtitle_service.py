@@ -43,16 +43,35 @@ def _wrap_two_lines(text: str, max_chars: int) -> str:
     t = str(text or "").strip()
     if not t:
         return ""
-    lines = _sanitize_lines(t)
-    if not lines:
-        return ""
-    if len(lines) >= 2:
-        return "\n".join(lines[:2])
-    s = lines[0]
-    if len(s) <= max_chars:
-        return s
-    cut = max(1, min(len(s) - 1, max_chars))
-    return s[:cut].rstrip() + "\n" + s[cut:].lstrip()
+    
+    # Simple split strategy: 
+    # If text is too long, split it by punctuation or length
+    if len(t) <= max_chars:
+        return t
+        
+    # Try splitting by common punctuation
+    punctuations = ["，", "。", "！", "？", ",", ".", "!", "?"]
+    best_split = -1
+    
+    # Find the punctuation closest to the middle
+    mid = len(t) // 2
+    min_dist = len(t)
+    
+    for p in punctuations:
+        idx = t.find(p)
+        while idx != -1:
+            dist = abs(idx - mid)
+            if dist < min_dist:
+                min_dist = dist
+                best_split = idx + 1 # Include punctuation in first line
+            idx = t.find(p, idx + 1)
+            
+    if best_split != -1 and best_split < len(t):
+        return t[:best_split].strip() + "\n" + t[best_split:].strip()
+        
+    # Fallback: Split by length
+    cut = max(1, min(len(t) - 1, max_chars))
+    return t[:cut].strip() + "\n" + t[cut:].strip()
 
 
 def build_vtt(
