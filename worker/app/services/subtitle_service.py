@@ -88,14 +88,15 @@ def build_vtt(
     lines: list[str] = []
     lines.append("WEBVTT")
     lines.append("")
-    lines.append("STYLE")
-    lines.append("::cue {")
-    lines.append("  color: #fff;")
-    lines.append("  background: rgba(0,0,0,0.55);")
-    lines.append("  text-shadow: 0 2px 8px rgba(0,0,0,0.65);")
-    lines.append("  font-weight: 700;")
-    lines.append("}")
-    lines.append("")
+    # STYLE block removed to improve compatibility with some players
+    # lines.append("STYLE")
+    # lines.append("::cue {")
+    # lines.append("  color: #fff;")
+    # lines.append("  background: rgba(0,0,0,0.55);")
+    # lines.append("  text-shadow: 0 2px 8px rgba(0,0,0,0.65);")
+    # lines.append("  font-weight: 700;")
+    # lines.append("}")
+    # lines.append("")
 
     t = 0.0
     for i, (seg, seg_dur) in enumerate(zip(segs, clamped), start=1):
@@ -148,14 +149,15 @@ def build_vtt_from_cues(
     lines: list[str] = []
     lines.append("WEBVTT")
     lines.append("")
-    lines.append("STYLE")
-    lines.append("::cue {")
-    lines.append("  color: #fff;")
-    lines.append("  background: rgba(0,0,0,0.55);")
-    lines.append("  text-shadow: 0 2px 8px rgba(0,0,0,0.65);")
-    lines.append("  font-weight: 700;")
-    lines.append("}")
-    lines.append("")
+    # STYLE block removed to improve compatibility
+    # lines.append("STYLE")
+    # lines.append("::cue {")
+    # lines.append("  color: #fff;")
+    # lines.append("  background: rgba(0,0,0,0.55);")
+    # lines.append("  text-shadow: 0 2px 8px rgba(0,0,0,0.65);")
+    # lines.append("  font-weight: 700;")
+    # lines.append("}")
+    # lines.append("")
 
     for i, (start, end, seg) in enumerate(items, start=1):
         txt = _wrap_two_lines(seg, max_chars=max_chars_per_line)
