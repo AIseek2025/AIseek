@@ -274,19 +274,27 @@ def _wanx_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optional[
              # If async task submitted
              task_id = js.get("output", {}).get("task_id")
              if task_id:
-                 # Poll for result (simplified for now)
-                 for _ in range(10):
+                 # Poll for result (more robust polling)
+                 # Wait up to 60 seconds (30 * 2s)
+                 for _ in range(30):
                      time.sleep(2)
                      task_url = f"{base}/api/v1/tasks/{task_id}"
-                     with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
-                         r_task = client.get(task_url, headers={"Authorization": f"Bearer {key}"})
-                         js_task = r_task.json()
-                         if js_task.get("output", {}).get("task_status") == "SUCCEEDED":
-                             js = js_task
-                             break
-                         if js_task.get("output", {}).get("task_status") == "FAILED":
-                             trace.append({"t": "provider_fail", "p": "wanx", "reason": "task_failed"})
-                             return None
+                     try:
+                         with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
+                             r_task = client.get(task_url, headers={"Authorization": f"Bearer {key}"})
+                             js_task = r_task.json()
+                             
+                             # Correct way to check task status in Wanx API
+                             status = js_task.get("output", {}).get("task_status")
+                             if status == "SUCCEEDED":
+                                 js = js_task
+                                 break
+                             if status == "FAILED":
+                                 trace.append({"t": "provider_fail", "p": "wanx", "reason": "task_failed", "resp": str(js_task)[:200]})
+                                 return None
+                             # If PENDING or RUNNING, continue waiting
+                     except Exception:
+                         continue
         
         # Extract image URL
         img_url = None
