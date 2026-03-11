@@ -91,6 +91,8 @@ services:
       - ../../worker/data:/app/data
       - ../../worker/outputs:/app/outputs
       - ../../worker/assets:/app/assets
+      # Map to shared volume for nginx to serve
+      - ../../backend/static:/srv/aiseek/static
       - ../../backend/static:/app/backend/static
     command: celery -A app.worker.celery_app worker -Q ai --loglevel=info --concurrency=${WORKER_CONCURRENCY:-4} --prefetch-multiplier=1 --max-tasks-per-child=50
     depends_on:
