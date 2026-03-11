@@ -197,107 +197,126 @@ def _openai_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optiona
 
 
 def _wanx_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optional[str]:
-    key = str(getattr(settings, "cover_wan_api_key", "") or "").strip() or str(os.getenv("DASHSCOPE_API_KEY") or "").strip() or str(os.getenv("COVER_WAN_API_KEY") or "").strip()
+    # Try all possible env vars for key
+    key = str(getattr(settings, "cover_wan_api_key", "") or "").strip() 
+    if not key:
+        key = str(os.getenv("DASHSCOPE_API_KEY") or "").strip()
+    if not key:
+        key = str(os.getenv("COVER_WAN_API_KEY") or "").strip()
+        
     if not key:
         trace.append({"t": "provider_skip", "p": "wanx", "reason": "no_key"})
         return None
+    
+    # Check circuit breaker
     if _cb_open("wanx"):
         trace.append({"t": "provider_skip", "p": "wanx", "reason": "circuit_open"})
         return None
+
+    # Construct API URL
     base = str(getattr(settings, "cover_wan_base_url", "https://dashscope.aliyuncs.com") or "").rstrip("/")
     if base.endswith("/api/v1"):
         base = base[: -len("/api/v1")]
-    url = f"{base}/api/v1/services/aigc/multimodal-generation/generation"
-
+    
+    # Use the correct endpoint for Wanx T2I
+    url = f"{base}/api/v1/services/aigc/text2image/image-synthesis"
+    
     req = "9:16竖屏" if str(plan.orientation) != "landscape" else "16:9横屏"
-    size = "960*1696" if str(plan.orientation) != "landscape" else "1696*960"
+    size = "1024*1792" if str(plan.orientation) != "landscape" else "1792*1024"
+    
+    # Enhanced prompt for better quality
     prompt = (
-        f"短视频封面，{req}，标题：{plan.title_text}，副标题：{plan.subtitle_text}。"
-        f"画面：{plan.visual_prompt_en}。风格：{plan.style}。"
-        "要求：构图居中，文字区域清晰可读，高清，干净背景，无水印无logo。"
+        f"一张高质量的短视频封面图，{req}。"
+        f"主标题文字：{plan.title_text}。"
+        f"画面描述：{plan.visual_prompt_en}。"
+        f"风格：{plan.style}，高清晰度，电影质感，色彩鲜艳，构图完美，无模糊，无水印。"
     )
-    negative = "模糊，低质量，文字扭曲，水印，logo，血腥，暴力细节"
+    
+    # Wanx specific payload structure
     payload = {
-        "model": str(getattr(settings, "cover_wan_model", "wan2.6-t2i")),
+        "model": "wanx-v1", 
         "input": {
-            "messages": [
-                {"role": "user", "content": [{"text": prompt}]},
-            ]
+            "prompt": prompt
         },
         "parameters": {
-            "prompt_extend": True,
-            "watermark": False,
-            "n": 1,
-            "negative_prompt": negative,
+            "style": "<auto>",
             "size": size,
-        },
+            "n": 1
+        }
     }
+    
     out_dir = OUTPUTS_DIR / "covers" / str(job_id) / str(uuid.uuid4())
     out_dir.mkdir(parents=True, exist_ok=True)
     out_img = out_dir / "cover.png"
+    
     try:
-        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        headers = {
+            "Authorization": f"Bearer {key}", 
+            "Content-Type": "application/json",
+            "X-DashScope-Async": "enable" # Use async mode if needed, but here we try sync first
+        }
+        
         t0 = time.time()
-        last_err = None
-        for attempt in range(2):
-            try:
-                with httpx.Client(timeout=httpx.Timeout(20.0, connect=5.0)) as client:
-                    resp = client.post(url, headers=headers, json=payload)
-                if resp.status_code == 401 or resp.status_code == 403:
-                    trace.append({"t": "provider_fail", "p": "wanx", "reason": f"unauthorized:{resp.status_code}"})
-                    _cb_fail("wanx", hard=True)
-                    return None
-                js = resp.json()
-                if resp.status_code >= 400:
-                    code = str(js.get("code") or resp.status_code)
-                    msg = str(js.get("message") or "")[:180]
-                    last_err = f"{code}:{msg}"
-                    if str(code).lower() in {"quotaexceeded"}:
-                        _cb_fail("wanx", hard=True)
-                        trace.append({"t": "provider_fail", "p": "wanx", "reason": "quota_exceeded"})
-                        return None
-                    raise RuntimeError(last_err)
-                u = None
-                try:
-                    out = js.get("output") if isinstance(js, dict) else None
-                    choices = out.get("choices") if isinstance(out, dict) else None
-                    if isinstance(choices, list) and choices:
-                        msg = choices[0].get("message") if isinstance(choices[0], dict) else None
-                        cnt = msg.get("content") if isinstance(msg, dict) else None
-                        if isinstance(cnt, list) and cnt:
-                            u = cnt[0].get("image") if isinstance(cnt[0], dict) else None
-                    if not u:
-                        results = out.get("results") if isinstance(out, dict) else None
-                        if isinstance(results, list) and results:
-                            u = results[0].get("url")
-                except Exception:
-                    u = None
-                if not u:
-                    last_err = "no_result_url"
-                    raise RuntimeError(last_err)
-                with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
-                    r2 = client.get(str(u), follow_redirects=True)
-                if r2.status_code >= 400:
-                    last_err = f"download_failed:{r2.status_code}"
-                    raise RuntimeError(last_err)
-                out_img.write_bytes(r2.content)
+        
+        # Call API
+        with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
+            resp = client.post(url, headers=headers, json=payload)
+            
+        if resp.status_code != 200:
+            trace.append({"t": "provider_fail", "p": "wanx", "reason": f"http_status:{resp.status_code}", "body": resp.text[:200]})
+            _cb_fail("wanx", hard=False)
+            return None
+            
+        js = resp.json()
+        
+        # Check output
+        if "output" not in js:
+             # If async task submitted
+             task_id = js.get("output", {}).get("task_id")
+             if task_id:
+                 # Poll for result (simplified for now)
+                 for _ in range(10):
+                     time.sleep(2)
+                     task_url = f"{base}/api/v1/tasks/{task_id}"
+                     with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
+                         r_task = client.get(task_url, headers={"Authorization": f"Bearer {key}"})
+                         js_task = r_task.json()
+                         if js_task.get("output", {}).get("task_status") == "SUCCEEDED":
+                             js = js_task
+                             break
+                         if js_task.get("output", {}).get("task_status") == "FAILED":
+                             trace.append({"t": "provider_fail", "p": "wanx", "reason": "task_failed"})
+                             return None
+        
+        # Extract image URL
+        img_url = None
+        try:
+            results = js.get("output", {}).get("results", [])
+            if results:
+                img_url = results[0].get("url")
+        except Exception:
+            pass
+            
+        if not img_url:
+             trace.append({"t": "provider_fail", "p": "wanx", "reason": "no_image_url", "resp": str(js)[:200]})
+             return None
+             
+        # Download image
+        with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
+            r_img = client.get(img_url)
+            if r_img.status_code == 200:
+                out_img.write_bytes(r_img.content)
                 dt = int(round((time.time() - t0) * 1000))
-                if out_img.exists() and out_img.stat().st_size > 10_000:
+                if out_img.exists() and out_img.stat().st_size > 1000:
                     trace.append({"t": "provider_ok", "p": "wanx", "ms": dt, "path": str(out_img)})
                     _cb_success("wanx")
                     return str(out_img)
-                last_err = "small_file"
-                raise RuntimeError(last_err)
-            except Exception as e:
-                last_err = str(e)[:180]
-                if attempt == 0:
-                    time.sleep(0.6)
-                continue
-        trace.append({"t": "provider_fail", "p": "wanx", "reason": str(last_err or "unknown")[:180]})
-        _cb_fail("wanx", hard=False)
+        
+        trace.append({"t": "provider_fail", "p": "wanx", "reason": "download_failed"})
         return None
+
     except Exception as e:
-        trace.append({"t": "provider_fail", "p": "wanx", "reason": str(e)[:180]})
+        trace.append({"t": "provider_fail", "p": "wanx", "reason": str(e)[:200]})
         _cb_fail("wanx", hard=False)
         return None
 
