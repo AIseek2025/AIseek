@@ -502,6 +502,7 @@ async def process_job(job_data: dict):
         cover_url = None
         try:
             cov = None
+            # Prioritize AI generated cover if available
             if cover_image_path and os.path.exists(str(cover_image_path)):
                 try:
                     p = Path(str(cover_image_path))
@@ -511,12 +512,19 @@ async def process_job(job_data: dict):
                         "jpg": str(p) if p.suffix.lower() in {".jpg", ".jpeg"} else None,
                         "png": str(p) if p.suffix.lower() == ".png" else None,
                     }
+                    # Explicitly mark as AI generated to prevent overwrite
+                    logger.info(f"Using AI generated cover: {cover_image_path}")
                 except Exception:
                     cov = None
+            
+            # Only fallback to video snapshot if NO AI cover exists
             if not cov:
+                logger.info("No AI cover found, falling back to video snapshot...")
                 cov = video_service.generate_cover(job_id, video_path, orientation=str(job_data.get("cover_orientation") or "portrait"))
+            
             cover_dir = str((cov or {}).get("dir") or "").strip() or None
             cover_path = str((cov or {}).get("webp") or (cov or {}).get("jpg") or (cov or {}).get("png") or "").strip()
+            
             if cover_path and os.path.exists(cover_path):
                 ct = "image/webp" if cover_path.lower().endswith(".webp") else "image/png" if cover_path.lower().endswith(".png") else "image/jpeg"
                 ext = ".webp" if ct == "image/webp" else ".png" if ct == "image/png" else ".jpg"
