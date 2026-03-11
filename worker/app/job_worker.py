@@ -418,6 +418,9 @@ async def process_job(job_data: dict):
                 cover_trace = cres.trace
                 cover_audit = {"provider": cres.provider, "embedded": True, "type": "generated"}
                 logger.info(f"cover_generated job_id={job_id} provider={cres.provider} path={cover_image_path}")
+            else:
+                logger.warning(f"cover_generation_failed_but_no_exception job_id={job_id} trace={cres.trace}")
+                cover_trace = cres.trace
         except Exception as e:
             logger.warning(f"cover_generate_failed job_id={job_id}: {e}")
 
