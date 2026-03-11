@@ -25,9 +25,19 @@ def _collect_dir_videos(d: Path) -> List[Path]:
 
 def select_background_video(job_id: str, keywords: Optional[List[str]] = None) -> Optional[Path]:
     mode = str(getattr(settings, "video_bg_mode", "placeholder") or "placeholder").lower()
-    if mode != "placeholder":
-        return None
+    
+    # Check for placeholder directory configuration
+    d = getattr(settings, "video_bg_dir", None)
+    if isinstance(d, str) and d.strip():
+        items = _collect_dir_videos(Path(d.strip()))
+        if items:
+            # Use job_id + current time to ensure randomness even for same job retry
+            import time
+            seed_val = str(job_id or "") + str(time.time())
+            r = random.Random(seed_val)
+            return items[int(r.random() * len(items))]
 
+    # Fallback to single placeholder file if configured
     p = getattr(settings, "video_bg_path", None)
     if isinstance(p, str) and p.strip():
         pp = Path(p.strip())
@@ -36,13 +46,6 @@ def select_background_video(job_id: str, keywords: Optional[List[str]] = None) -
                 return pp
         except Exception:
             pass
-
-    d = getattr(settings, "video_bg_dir", None)
-    if isinstance(d, str) and d.strip():
-        items = _collect_dir_videos(Path(d.strip()))
-        if items:
-            r = random.Random(str(job_id or ""))
-            return items[int(r.random() * len(items))]
 
     try:
         if PLACEHOLDER_VIDEO.exists() and PLACEHOLDER_VIDEO.is_file() and PLACEHOLDER_VIDEO.stat().st_size > 0:
