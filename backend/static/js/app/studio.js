@@ -866,11 +866,12 @@
     // Allow HLS or MP4
     const src = hls || mp4 || "";
     const ve = $("videoEl");
+    
+    // Explicitly reset poster first
+    try { ve.removeAttribute("poster"); } catch (_) {}
+    
     if (cover) {
       try { ve.poster = cover; } catch (_) {}
-    } else {
-      // Clear poster if no cover available
-      try { ve.removeAttribute("poster"); } catch (_) {}
     }
     applySubtitleTracks(tracks);
     
