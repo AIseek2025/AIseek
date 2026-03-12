@@ -53,6 +53,18 @@ def _run(coro):
                 pass
 
 
+@celery_app.task(name="app.tasks.client_events.drain_client_event_stream")
+def drain_client_event_stream_stub(*args, **kwargs):
+    # This is a stub to prevent Worker from crashing on unknown task
+    print(f"Ignored legacy task drain_client_event_stream: {args} {kwargs}")
+    return True
+
+@celery_app.task(name="app.tasks.search_index.index_post")
+def index_post_stub(*args, **kwargs):
+    # This is a stub to prevent Worker from crashing on unknown task
+    print(f"Ignored legacy task index_post: {args} {kwargs}")
+    return True
+
 @celery_app.task(name="generate_video")
 def generate_video_task(job_id: str, content: str, user_id: str, post_id: str = None, post_type: str = "video", custom_instructions: str = None, voice_style: str = None, bgm_mood: str = None, bgm_id: str = None, subtitle_mode: str = None, requested_duration_sec: int = None, target_sec: int = None, draft_json: dict = None, cover_orientation: str = None):
     # Bridge to existing async logic
