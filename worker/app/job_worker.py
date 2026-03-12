@@ -307,7 +307,28 @@ async def process_job(job_data: dict):
             
         if not subtitle_zh_segments:
             # If no subtitles from analysis, split voice_text by lines
-            subtitle_zh_segments = [str(x).strip() for x in str(voice_text or "").splitlines() if str(x).strip()]
+            raw_lines = [str(x).strip() for x in str(voice_text or "").splitlines() if str(x).strip()]
+            subtitle_zh_segments = []
+            import re
+            for line in raw_lines:
+                # Split by punctuation to avoid huge subtitles
+                parts = re.split(r'([。！？；!?;])', line)
+                buf = ""
+                for p in parts:
+                    if p in "。！？；!?;":
+                        buf += p
+                        if buf.strip():
+                            subtitle_zh_segments.append(buf.strip())
+                        buf = ""
+                    else:
+                        if len(buf) + len(p) > 50: # Force split if too long
+                             if buf.strip():
+                                 subtitle_zh_segments.append(buf.strip())
+                             buf = p
+                        else:
+                             buf += p
+                if buf.strip():
+                    subtitle_zh_segments.append(buf.strip())
         try:
             import re
 

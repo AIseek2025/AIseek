@@ -9,6 +9,9 @@ from app.services.placeholder.orchestrator import pick_background_video
 from app.services.placeholder.orchestrator import pick_background_video
 
 import asyncio
+import nest_asyncio
+nest_asyncio.apply()
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -62,11 +65,14 @@ def select_background_video(job_id: str, keywords: Optional[List[str]] = None) -
                  )
              
              if loop.is_running():
-                 # We are already in an async loop (e.g. Celery with gevent/eventlet, or some other async context)
-                 # This is tricky. For now, let's skip API in this specific edge case to avoid blocking/crashing
-                 # OR use nest_asyncio if installed. 
-                 # Better fallback: Just log and fallback to local files.
-                 logger.warning("Event loop is already running, skipping API search to avoid conflict.")
+                 # With nest_asyncio, we can re-enter the loop safely
+                 # This allows API calls even inside Celery/other async contexts
+                 res = loop.run_until_complete(_run())
+                 if res.picked and res.picked.path:
+                     p = Path(res.picked.path)
+                     if p.exists():
+                         logger.info(f"API selected background video: {p}")
+                         return p
              else:
                  res = loop.run_until_complete(_run())
                  if res.picked and res.picked.path:
