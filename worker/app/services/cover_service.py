@@ -281,35 +281,35 @@ def _wanx_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optional[
              # Poll for result (more robust polling)
              # Wait up to 120 seconds (40 * 3s)
              start_poll = time.time()
-                 poll_attempts = 0
-                 while time.time() - start_poll < 120:
-                     poll_attempts += 1
-                     time.sleep(3)
-                     task_url = f"{base}/api/v1/tasks/{task_id}"
-                     try:
-                         with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
-                             r_task = client.get(task_url, headers={"Authorization": f"Bearer {key}"})
-                             if r_task.status_code != 200:
-                                 continue
-                             js_task = r_task.json()
-                             
-                             status = js_task.get("output", {}).get("task_status")
-                             # Log polling status occasionally
-                             if poll_attempts % 5 == 0:
-                                 trace.append({"t": "wanx_poll", "status": status, "attempt": poll_attempts})
-                                 
-                             if status == "SUCCEEDED":
-                                 js = js_task
-                                 break
-                             if status == "FAILED":
-                                 trace.append({"t": "provider_fail", "p": "wanx", "reason": "task_failed", "resp": str(js_task)[:200]})
-                                 return None
-                             # If PENDING or RUNNING, continue waiting
-                     except Exception as e:
-                         # Log exception but continue polling
+             poll_attempts = 0
+             while time.time() - start_poll < 120:
+                 poll_attempts += 1
+                 time.sleep(3)
+                 task_url = f"{base}/api/v1/tasks/{task_id}"
+                 try:
+                     with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
+                         r_task = client.get(task_url, headers={"Authorization": f"Bearer {key}"})
+                         if r_task.status_code != 200:
+                             continue
+                         js_task = r_task.json()
+                         
+                         status = js_task.get("output", {}).get("task_status")
+                         # Log polling status occasionally
                          if poll_attempts % 5 == 0:
-                             trace.append({"t": "wanx_poll_error", "err": str(e)[:100]})
-                         continue
+                             trace.append({"t": "wanx_poll", "status": status, "attempt": poll_attempts})
+                             
+                         if status == "SUCCEEDED":
+                             js = js_task
+                             break
+                         if status == "FAILED":
+                             trace.append({"t": "provider_fail", "p": "wanx", "reason": "task_failed", "resp": str(js_task)[:200]})
+                             return None
+                         # If PENDING or RUNNING, continue waiting
+                 except Exception as e:
+                     # Log exception but continue polling
+                     if poll_attempts % 5 == 0:
+                         trace.append({"t": "wanx_poll_error", "err": str(e)[:100]})
+                     continue
         
         # Extract image URL
         img_url = None
