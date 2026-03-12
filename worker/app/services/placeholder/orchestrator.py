@@ -13,7 +13,7 @@ from app.services.placeholder.core_types import CandidateClip, PickedBackground,
 from app.services.placeholder.errors import PlaceholderError
 from app.services.placeholder.persona_client import fetch_persona_tags
 from app.services.placeholder.prompt_service import build_search_plans
-from app.services.placeholder.providers import search_provider
+from app.services.placeholder.providers.base import search_provider
 from app.services.placeholder.scoring import score_clip
 
 

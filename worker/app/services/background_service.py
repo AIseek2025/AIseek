@@ -6,6 +6,9 @@ from app.core.config import PLACEHOLDER_VIDEO, settings
 from app.services.placeholder.composer import compose_background
 from app.services.placeholder.orchestrator import pick_background_video
 
+from app.services.placeholder.orchestrator import pick_background_video
+
+import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,6 +37,36 @@ def select_background_video(job_id: str, keywords: Optional[List[str]] = None) -
     mode = str(getattr(settings, "video_bg_mode", "placeholder") or "placeholder").lower()
     logger.info(f"Selecting background video for job {job_id}, mode={mode}")
     
+    # Try API first if configured
+    if mode == "api" or (keywords and len(keywords) > 0):
+         try:
+             # Run async function in sync context
+             loop = asyncio.new_event_loop()
+             asyncio.set_event_loop(loop)
+             
+             async def _run():
+                 return await pick_background_video(
+                     user_id=0,
+                     title=" ".join(keywords or []),
+                     content="",
+                     visual_prompts_en=keywords or [],
+                     orientation="portrait",
+                     min_w=1080,
+                     min_h=1920,
+                     target_sec=30
+                 )
+             
+             res = loop.run_until_complete(_run())
+             # loop.close() # Avoid closing loop if it causes issues, or handle gracefully
+             
+             if res.picked and res.picked.path:
+                 p = Path(res.picked.path)
+                 if p.exists():
+                     logger.info(f"API selected background video: {p}")
+                     return p
+         except Exception as e:
+             logger.error(f"API background selection failed: {e}")
+
     # Check for placeholder directory configuration
     d = getattr(settings, "video_bg_dir", None)
     if isinstance(d, str) and d.strip():
