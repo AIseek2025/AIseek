@@ -6,11 +6,16 @@ from app.core.config import PLACEHOLDER_VIDEO, settings
 from app.services.placeholder.composer import compose_background
 from app.services.placeholder.orchestrator import pick_background_video
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def _collect_dir_videos(d: Path) -> List[Path]:
     out: List[Path] = []
     try:
         if not d.exists() or not d.is_dir():
+            logger.warning(f"Background dir {d} does not exist or is not a directory")
             return []
         for p in sorted(d.glob("*.mp4")):
             try:
@@ -18,24 +23,33 @@ def _collect_dir_videos(d: Path) -> List[Path]:
                     out.append(p)
             except Exception:
                 continue
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error collecting videos from {d}: {e}")
         return []
+    logger.info(f"Collected {len(out)} background videos from {d}")
     return out
 
 
 def select_background_video(job_id: str, keywords: Optional[List[str]] = None) -> Optional[Path]:
     mode = str(getattr(settings, "video_bg_mode", "placeholder") or "placeholder").lower()
+    logger.info(f"Selecting background video for job {job_id}, mode={mode}")
     
     # Check for placeholder directory configuration
     d = getattr(settings, "video_bg_dir", None)
     if isinstance(d, str) and d.strip():
-        items = _collect_dir_videos(Path(d.strip()))
+        dir_path = Path(d.strip())
+        logger.info(f"Checking configured video_bg_dir: {dir_path}")
+        items = _collect_dir_videos(dir_path)
         if items:
             # Use job_id + current time to ensure randomness even for same job retry
             import time
             seed_val = str(job_id or "") + str(time.time())
             r = random.Random(seed_val)
-            return items[int(r.random() * len(items))]
+            selected = items[int(r.random() * len(items))]
+            logger.info(f"Selected random background video: {selected}")
+            return selected
+        else:
+            logger.warning(f"No valid videos found in {dir_path}")
 
     # Fallback to single placeholder file if configured
     p = getattr(settings, "video_bg_path", None)
