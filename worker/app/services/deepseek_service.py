@@ -86,19 +86,20 @@ class DeepSeekService:
                 "用户会给你一篇原始文章，你的任务是将其转化为高质量的短视频创作方案。"
                 "请严格按照以下步骤进行思考和创作："
                 "1. 【审稿】：首先判断文章内容是否合规、是否有价值。如果内容空洞、违规或完全无法转化为视频，请在 summary 中明确指出，但仍需尝试生成。"
-                "2. 【提炼与改写】：通读全文，提取核心观点和精华内容。必须对原文进行深度改写，将其转化为适合口播的、口语化的、有吸引力的短视频文案。禁止直接截取原文段落！文案要短小精悍，金句频出。"
+                "2. 【提炼与改写】：通读全文，提取核心观点和精华内容。必须对原文进行深度改写，将其转化为适合口播的、口语化的、有吸引力的短视频文案。禁止直接截取原文段落！每一段口播文案（narration）必须控制在60字以内，确保语速适中。"
                 "3. 【标题与标签】：根据改写后的文案，起一个极具吸引力（标题党但不过分）的标题，并提取精准的标签。"
                 "4. 【视觉方案】：为每一段文案设计具体的画面描述（visual_prompt_en），要求画面感强，能指导AI生图。"
                 "5. 【音乐方案】：选择最匹配文案情感的背景音乐。"
                 "请用JSON格式严格返回，字段包括："
                 "title（视频标题，30字以内，吸引人），summary（50字左右的内容摘要），"
                 "production_script（对象，包含："
-                "scenes（数组，每项包含：idx（从1开始），duration_sec（整数，建议4-8秒），narration（该段口播文案，必须是经过深度改写的、口语化的中文，禁止照搬原文），subtitle（该段字幕，通常与口播一致），visual_prompt_en（英文画面描述，必须具体、细致，包含主体、环境、风格、光影等细节，例如 'A futuristic city street at night, neon lights, cyberpunk style, cinematic lighting'），shot（镜头类型如 closeup/medium/wide），transition（转场如 cut/fade）），"
+                "scenes（数组，每项包含：idx（从1开始），duration_sec（整数，建议4-8秒），narration（该段口播文案，必须是经过深度改写的、口语化的中文，禁止照搬原文，每段<=60字），subtitle（该段字幕，必须简短，如果口播较长，请在此处仅显示核心关键词或短句，避免字幕遮挡画面），visual_prompt_en（英文画面描述，必须具体、细致，包含主体、环境、风格、光影等细节，例如 'A futuristic city street at night, neon lights, cyberpunk style, cinematic lighting'），shot（镜头类型如 closeup/medium/wide），transition（转场如 cut/fade）），"
                 "cover（对象：visual_prompt_en（封面图英文描述，必须极具视觉冲击力，高品质，例如 'High quality 3D render of a glowing brain, dark background, cinematic, 8k'），title_text（封面主标题，简短有力），subtitle_text（封面副标题，可空）），"
                 "music（对象：mood（背景音乐情绪，如'cheerful'|'serious'|'relaxing'|'tech'|'lofi'|'ambient'|'piano'|'acoustic'|'hiphop'|'edm'|'synthwave'|'orchestral'|'corporate'|'jazz'|'rock'），tags（数组，音乐标签，如'ambient','piano','trap'））"
                 "），"
                 "voice_text（完整口播文案，由 scenes.narration 拼接而成，用于语音合成），"
                 "subtitles（数组，每项包含 text 字段；由 scenes.subtitle 汇总）。"
+                "警告：如果检测到文案与原文重复度过高，或者直接复制粘贴，你的回答将被判定为无效。"
                 "只返回JSON，不要包含任何额外说明。"
             )
 
@@ -130,6 +131,9 @@ class DeepSeekService:
         text = response.choices[0].message.content
         if not text:
             raise ValueError("Empty response from DeepSeek")
+        
+        # Add detailed logging for debugging content rewriting issues
+        logger.info(f"DeepSeek response (first 1000 chars): {text[:1000]}")
 
         def _try_parse(raw: str):
             try:

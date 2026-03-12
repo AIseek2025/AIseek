@@ -270,13 +270,17 @@ def _wanx_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optional[
         js = resp.json()
         
         # Check output
-        if "output" not in js:
-             # If async task submitted
-             task_id = js.get("output", {}).get("task_id")
-             if task_id:
-                 # Poll for result (more robust polling)
-                 # Wait up to 120 seconds (40 * 3s)
-                 start_poll = time.time()
+        # Wanx async task response structure: {"output": {"task_id": "..."}}
+        # Wanx sync task response structure: {"output": {"results": [...]}}
+        
+        task_id = None
+        if isinstance(js.get("output"), dict):
+            task_id = js.get("output", {}).get("task_id")
+            
+        if task_id:
+             # Poll for result (more robust polling)
+             # Wait up to 120 seconds (40 * 3s)
+             start_poll = time.time()
                  poll_attempts = 0
                  while time.time() - start_poll < 120:
                      poll_attempts += 1
