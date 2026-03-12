@@ -40,10 +40,15 @@ def select_background_video(job_id: str, keywords: Optional[List[str]] = None) -
     # Try API first if configured
     if mode == "api" or (keywords and len(keywords) > 0):
          try:
-             # Run async function in sync context
-             loop = asyncio.new_event_loop()
-             asyncio.set_event_loop(loop)
-             
+             # Run async function in sync context safely
+             try:
+                 loop = asyncio.get_event_loop()
+                 if loop.is_closed():
+                     raise RuntimeError("Loop is closed")
+             except RuntimeError:
+                 loop = asyncio.new_event_loop()
+                 asyncio.set_event_loop(loop)
+
              async def _run():
                  return await pick_background_video(
                      user_id=0,
@@ -56,19 +61,30 @@ def select_background_video(job_id: str, keywords: Optional[List[str]] = None) -
                      target_sec=30
                  )
              
-             res = loop.run_until_complete(_run())
-             # loop.close() # Avoid closing loop if it causes issues, or handle gracefully
-             
-             if res.picked and res.picked.path:
-                 p = Path(res.picked.path)
-                 if p.exists():
-                     logger.info(f"API selected background video: {p}")
-                     return p
+             if loop.is_running():
+                 # We are already in an async loop (e.g. Celery with gevent/eventlet, or some other async context)
+                 # This is tricky. For now, let's skip API in this specific edge case to avoid blocking/crashing
+                 # OR use nest_asyncio if installed. 
+                 # Better fallback: Just log and fallback to local files.
+                 logger.warning("Event loop is already running, skipping API search to avoid conflict.")
+             else:
+                 res = loop.run_until_complete(_run())
+                 if res.picked and res.picked.path:
+                     p = Path(res.picked.path)
+                     if p.exists():
+                         logger.info(f"API selected background video: {p}")
+                         return p
          except Exception as e:
              logger.error(f"API background selection failed: {e}")
 
     # Check for placeholder directory configuration
     d = getattr(settings, "video_bg_dir", None)
+    # If not set, default to standard assets/bg_variants location if exists
+    if not d:
+        default_bg_dir = Path("/app/assets/bg_variants")
+        if default_bg_dir.exists() and default_bg_dir.is_dir():
+            d = str(default_bg_dir)
+            
     if isinstance(d, str) and d.strip():
         dir_path = Path(d.strip())
         logger.info(f"Checking configured video_bg_dir: {dir_path}")
