@@ -13,3 +13,4 @@ celery
 redis
 sqlalchemy
 psycopg2-binary
+nest_asyncio
