@@ -55,9 +55,9 @@ def select_background_video(job_id: str, keywords: Optional[List[str]] = None) -
                      title=" ".join(keywords or []),
                      content="",
                      visual_prompts_en=keywords or [],
-                     orientation="portrait",
-                     min_w=1080,
-                     min_h=1920,
+                     orientation=str(getattr(settings, "placeholder_orientation", "portrait") or "portrait"),
+                     min_w=int(getattr(settings, "placeholder_min_width", 1080) or 1080),
+                     min_h=int(getattr(settings, "placeholder_min_height", 1920) or 1920),
                      target_sec=30
                  )
              

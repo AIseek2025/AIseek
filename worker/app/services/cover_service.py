@@ -135,7 +135,10 @@ def build_cover_plan(analysis: dict, *, fallback_title: str = "", fallback_summa
 
 
 def _openai_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optional[str]:
+    # Try all possible env vars for OpenAI key
     key = str(getattr(settings, "cover_openai_api_key", "") or "").strip()
+    if not key:
+        key = str(os.getenv("OPENAI_API_KEY") or "").strip()
     if not key:
         trace.append({"t": "provider_skip", "p": "openai", "reason": "no_key"})
         return None
@@ -203,6 +206,9 @@ def _wanx_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optional[
         key = str(os.getenv("DASHSCOPE_API_KEY") or "").strip()
     if not key:
         key = str(os.getenv("COVER_WAN_API_KEY") or "").strip()
+    if not key:
+        # Final fallback for hardcoded key if needed or from alternate location
+        key = str(os.getenv("WANX_API_KEY") or "").strip()
         
     if not key:
         trace.append({"t": "provider_skip", "p": "wanx", "reason": "no_key"})

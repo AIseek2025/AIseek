@@ -223,6 +223,10 @@ async def process_job(job_data: dict):
         title = analysis.get("title", "Untitled")
         summary = analysis.get("summary", "")
 
+        # IMPORTANT: If analysis provides refined voice_text (from DeepSeek's production_script), use it!
+        # Do not overwrite it with raw content unless it's missing.
+        # This fixes the issue where TTS reads raw content instead of refined script.
+        
         db.update_job(job_id, title=title, summary=summary)
         job_logger.processing(step="deepseek_analyzed", title=title)
         draft = None
@@ -291,11 +295,18 @@ async def process_job(job_data: dict):
             )
             return
 
-        voice_text = analysis.get("voice_text") or summary or ""
+        # Use refined voice_text if available, fallback to summary, then raw content
+        voice_text = analysis.get("voice_text")
+        if not voice_text:
+             voice_text = analysis.get("summary")
+             
         voice_text = str(voice_text or "").strip()
         if not voice_text:
-            voice_text = str(content or "").strip()[:400] or "AI生成短视频。"
+            # Only fallback to raw content if absolutely nothing came back from analysis
+            voice_text = str(content or "").strip()[:600] or "AI生成短视频。"
+            
         if not subtitle_zh_segments:
+            # If no subtitles from analysis, split voice_text by lines
             subtitle_zh_segments = [str(x).strip() for x in str(voice_text or "").splitlines() if str(x).strip()]
         try:
             import re
