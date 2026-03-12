@@ -252,6 +252,31 @@ async def process_job(job_data: dict):
                             pass
                 subtitle_zh_segments = segs[:400]
                 if subtitle_zh_segments:
+                    # Force split large segments even if from production script
+                    import re
+                    fixed_segments = []
+                    for seg in subtitle_zh_segments:
+                        if len(seg) > 50:
+                            parts = re.split(r'([。！？；!?;])', seg)
+                            buf = ""
+                            for p in parts:
+                                if p in "。！？；!?;":
+                                    buf += p
+                                    if buf.strip():
+                                        fixed_segments.append(buf.strip())
+                                    buf = ""
+                                else:
+                                    if len(buf) + len(p) > 50:
+                                         if buf.strip():
+                                             fixed_segments.append(buf.strip())
+                                         buf = p
+                                    else:
+                                         buf += p
+                            if buf.strip():
+                                fixed_segments.append(buf.strip())
+                        else:
+                            fixed_segments.append(seg)
+                    subtitle_zh_segments = fixed_segments
                     analysis["subtitles"] = [{"text": x} for x in subtitle_zh_segments]
                     analysis["voice_text"] = "\n".join(subtitle_zh_segments).strip()
         except Exception:
@@ -304,6 +329,31 @@ async def process_job(job_data: dict):
         if not voice_text:
             # Only fallback to raw content if absolutely nothing came back from analysis
             voice_text = str(content or "").strip()[:600] or "AI生成短视频。"
+            
+        # Ensure voice_text is not a giant blob
+        if len(voice_text) > 100 and "\n" not in voice_text:
+             import re
+             # Split by punctuation
+             parts = re.split(r'([。！？；!?;])', voice_text)
+             buf = ""
+             lines = []
+             for p in parts:
+                 if p in "。！？；!?;":
+                     buf += p
+                     if buf.strip():
+                         lines.append(buf.strip())
+                     buf = ""
+                 else:
+                     if len(buf) + len(p) > 60:
+                          if buf.strip():
+                              lines.append(buf.strip())
+                          buf = p
+                     else:
+                          buf += p
+             if buf.strip():
+                 lines.append(buf.strip())
+             if lines:
+                 voice_text = "\n".join(lines)
             
         if not subtitle_zh_segments:
             # If no subtitles from analysis, split voice_text by lines

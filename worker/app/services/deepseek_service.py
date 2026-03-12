@@ -100,6 +100,7 @@ class DeepSeekService:
                 "voice_text（完整口播文案，由 scenes.narration 拼接而成，用于语音合成），"
                 "subtitles（数组，每项包含 text 字段；由 scenes.subtitle 汇总）。"
                 "警告：如果检测到文案与原文重复度过高，或者直接复制粘贴，你的回答将被判定为无效。"
+                "特别注意：narration 和 subtitle 必须包含清晰的标点符号（逗号、句号），禁止使用长难句，禁止一大段文字无标点。"
                 "只返回JSON，不要包含任何额外说明。"
             )
 
