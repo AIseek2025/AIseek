@@ -33,8 +33,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # 仅在配置了阿里云 SSH 密钥时执行
-    if: ${{ secrets.ALIYUN_HOST != '' }}
     steps:
     - name: Deploy via SSH
       uses: appleboy/ssh-action@v1.0.3
