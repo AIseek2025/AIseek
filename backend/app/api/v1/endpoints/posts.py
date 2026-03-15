@@ -204,6 +204,7 @@ class CallbackData(BaseModel):
     error: Optional[str] = None
     title: Optional[str] = None
     summary: Optional[str] = None
+    video_desc: Optional[str] = None
     subtitle_tracks: Optional[Any] = None
     analysis_audit: Optional[Any] = None
     subtitle_audit: Optional[Any] = None
@@ -1430,6 +1431,8 @@ async def worker_callback(
             post.title = data.title
     if data.summary:
         post.summary = data.summary
+    if data.video_desc is not None:
+        post.video_desc = data.video_desc
     if data.error:
         post.error_message = data.error
     elif st == "cancelled":

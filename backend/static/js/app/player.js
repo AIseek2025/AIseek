@@ -437,29 +437,9 @@ Object.assign(window.app, {
     _subtitleDisplayText: function(input) {
         const raw = String(input || '').replace(/\s+/g, ' ').trim();
         if (!raw) return '字幕已启用';
-        const max = 72;
-        const txt = raw.length <= max ? raw : `${raw.slice(0, max)}…`;
-        const unit = (ch) => /[A-Za-z0-9]/.test(ch) ? 0.58 : 1.0;
-        const limit = 16.6;
-        const out = [];
-        let cur = '';
-        let u = 0;
-        for (const ch of txt) {
-            const cu = unit(ch);
-            if (u + cu > limit) {
-                out.push(cur.trim());
-                cur = ch;
-                u = cu;
-                if (out.length >= 2) break;
-            } else {
-                cur += ch;
-                u += cu;
-            }
-        }
-        if (out.length < 2 && cur.trim()) out.push(cur.trim());
-        if (!out.length) return txt;
-        if (out.length === 1) return out[0];
-        return `${out[0]}\n${out[1]}`;
+        const noPunct = raw.replace(/[。！？；,.!?;:：、]/g, '').trim();
+        const max = 22;
+        return noPunct.length <= max ? noPunct : (noPunct.slice(0, max) + '…');
     },
 
     _subtitleStyleMode: function() {
@@ -527,7 +507,7 @@ Object.assign(window.app, {
             box.style.margin = '0 auto';
             box.style.overflow = 'hidden';
             box.style.display = '-webkit-box';
-            box.style.webkitLineClamp = '2';
+            box.style.webkitLineClamp = '1';
             box.style.webkitBoxOrient = 'vertical';
             box.style.wordBreak = 'break-word';
             box.style.opacity = '1';
@@ -871,7 +851,7 @@ Object.assign(window.app, {
         
         const avatar = post.user_avatar || '/static/img/default_avatar.svg';
         const nickname = post.user_nickname || '用户' + post.user_id;
-        const desc = this.formatPostDesc(post.content_text || post.title || '');
+        const desc = this.formatPostDesc(post.video_desc || post.summary || post.content_text || post.title || '');
 
         // Check if I am following this user
         // Note: The feed API needs to return 'is_following'. If not, we might need to check separately or default to show +
@@ -934,12 +914,14 @@ Object.assign(window.app, {
                     <div class="video-info-overlay">
                         <div class="video-author" data-action="call" data-fn="viewUserProfile" data-args="[${post.user_id}]" data-stop="1">@${nickname}</div>
                         <div class="video-desc">${desc}</div>
-                        <div class="video-music"><i class="fas fa-music"></i> ${(post.bgm_name && String(post.bgm_name).trim()) ? String(post.bgm_name).trim() : '原声'} - ${nickname}</div>
-                        <div class="video-stats" data-post-id="${post.id}">播放 ${this._fmtViews(post.views_count || 0)} · 点赞 ${this._fmtViews(post.likes_count || 0)}</div>
+                        <div class="video-music"><i class="fas fa-music"></i> ${(post.bgm_name && String(post.bgm_name).trim()) ? String(post.bgm_name).trim() : '原声'}</div>
                     </div>
 
                     <!-- Controls Bar -->
                     <div class="video-controls-bar" data-action="stop" data-stop="1">
+                        <div class="v-progress-top-row">
+                            <span class="v-view-count" data-post-id="${post.id}"><i class="fas fa-eye"></i> ${this._fmtViews(post.views_count || 0)}</span>
+                        </div>
                         <div class="v-progress-container" id="prog-c-${post.id}" data-action="call" data-fn="seekByPostId" data-args="[${post.id}]" data-pass-event="1" data-stop="1" data-el-pos="0"
                              data-action-pointerdown="call" data-fn-pointerdown="seekStartByPostId" data-args-pointerdown="[${post.id}]" data-pass-el-pointerdown="1" data-pass-event-pointerdown="1"
                              data-action-pointermove="call" data-fn-pointermove="seekMoveByPostId" data-args-pointermove="[${post.id}]" data-pass-el-pointermove="1" data-pass-event-pointermove="1"
@@ -1053,6 +1035,7 @@ Object.assign(window.app, {
                     if (pid) this.recordWatch(pid);
                     if (pid) this.state.activePostId = pid;
                     this.pauseAllVideosExcept(video);
+                    try { video.muted = !!this.state.isMuted; video.volume = Number(this.state.globalVolume || 0.5) || 0.5; } catch (_) {}
                     const p = video.play();
                     if (p) p.then(() => { if (btnPlay) btnPlay.className = 'fas fa-pause'; })
                            .catch(async () => {
@@ -1928,9 +1911,11 @@ Object.assign(window.app, {
             const slides = Array.from(page.querySelectorAll('.video-slide'));
             let bestSlide = null;
             let bestRatio = 0;
-            slides.forEach(slide => {
+            slides.forEach((slide, idx) => {
                 const r = ratioCache.get(slide);
-                if (typeof r === 'number' && r >= 0.6 && r > bestRatio) { bestRatio = r; bestSlide = slide; }
+                if (typeof r !== 'number' || r < 0.6) return;
+                const prevIdx = bestSlide != null ? slides.indexOf(bestSlide) : -1;
+                if (r > bestRatio || (r === bestRatio && prevIdx >= 0 && idx < prevIdx)) { bestRatio = r; bestSlide = slide; }
             });
             this.pauseAllVideosExcept(null);
             entries.forEach(entry => {
@@ -1952,12 +1937,7 @@ Object.assign(window.app, {
                 if (video) {
                     const pid = bestSlide.dataset ? parseInt(bestSlide.dataset.postId || '0', 10) : 0;
                     if (pid) { this.recordWatch(pid); this.state.activePostId = pid; }
-                    const slides = document.querySelectorAll('.video-slide');
-                    const isFirstSlide = slides.length > 0 && slides[0] === bestSlide;
-                    if (isFirstSlide) {
-                        try { video.muted = false; video.volume = Number(this.state.globalVolume || 0.5) || 0.5; } catch (_) {}
-                        try { this.state.isMuted = false; localStorage.setItem('is_muted', '0'); this._syncGlobalVolumeUIAll(); } catch (_) {}
-                    }
+                    try { video.muted = !!this.state.isMuted; video.volume = Number(this.state.globalVolume || 0.5) || 0.5; } catch (_) {}
                     const p = video.play();
                     if (p) p.then(() => { if (btnPlay) btnPlay.className = 'fas fa-pause'; }).catch(async () => {
                         try { video.muted = true; video.volume = 0; await video.play(); if (btnPlay) btnPlay.className = 'fas fa-pause'; } catch (_) { if (btnPlay) btnPlay.className = 'fas fa-play'; }
@@ -2083,10 +2063,8 @@ Object.assign(window.app, {
             document.querySelectorAll(`.jx-view-count[data-post-id="${pid}"]`).forEach(el => {
                 el.textContent = `播放 ${fmtViews(next)}`;
             });
-            document.querySelectorAll(`.video-stats[data-post-id="${pid}"]`).forEach(el => {
-                const p = (this.state.recommendPosts || []).find(x => x && Number(x.id) === pid);
-                const likes = p ? (Number(p.likes_count) || 0) : 0;
-                el.textContent = `播放 ${fmtViews(next)} · 点赞 ${fmtViews(likes)}`;
+            document.querySelectorAll(`.v-view-count[data-post-id="${pid}"]`).forEach(el => {
+                el.innerHTML = `<i class="fas fa-eye"></i> ${fmtViews(next)}`;
             });
         } catch (_) {
         }

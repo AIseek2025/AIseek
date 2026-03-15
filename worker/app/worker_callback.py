@@ -192,6 +192,7 @@ async def callback_web(
         "error": error,
         "title": job_data.get("title"),
         "summary": job_data.get("summary"),
+        "video_desc": job_data.get("video_desc"),
         "subtitle_tracks": subtitle_tracks,
         "analysis_audit": analysis_audit,
         "subtitle_audit": subtitle_audit,

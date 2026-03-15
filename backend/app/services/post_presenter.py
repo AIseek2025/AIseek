@@ -152,6 +152,7 @@ def serialize_post_base(post: Post, delta: Optional[Dict[str, int]] = None) -> D
         "id": int(post.id),
         "title": getattr(post, "title", None),
         "summary": getattr(post, "summary", None),
+        "video_desc": getattr(post, "video_desc", None),
         "post_type": getattr(post, "post_type", "video") or "video",
         "video_url": hls_url or mp4_url or video_url,
         "hls_url": hls_url,

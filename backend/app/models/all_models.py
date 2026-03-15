@@ -68,6 +68,7 @@ class Post(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
     summary = Column(Text, nullable=True)
+    video_desc = Column(Text, nullable=True)  # 视频介绍，展示在视频页右下方用户名下方
     
     # Category for "Featured" section
     # e.g., "AI", "Programming", "Ecommerce", "Marketing", "Multimodal", "Robots"

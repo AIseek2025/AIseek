@@ -20,7 +20,7 @@ from app.services.storage_service import storage_service
 from app.services.background_service import build_background_for_job, select_background_video
 from app.services.cover_service import CoverService, build_cover_plan, has_any_ai_cover_provider
 from app.services.bgm_service import bgm_service
-from app.services.subtitle_service import build_vtt_from_cues, build_cues_by_duration, evaluate_subtitle_quality
+from app.services.subtitle_service import build_vtt_from_cues, build_cues_by_duration, evaluate_subtitle_quality, expand_segments_by_sentences
 from app.worker_callback import callback_web, cleanup_job_files
 from app.pipeline.trace_logger import TraceLogger
 from app.pipeline.sanitizer import Sanitizer
@@ -244,13 +244,14 @@ class VideoPipeline:
         # Update DB
         title = analysis.get("title", "Untitled")
         summary = analysis.get("summary", "")
+        video_desc = analysis.get("video_desc", "")
         db.update_job(self.job_id, title=title, summary=summary)
         
         self.tracer.log_step("analyze", "ok", {"title": title, "voice_len": len(analysis["voice_text"])})
         msg = "文案分析完成"
         if isinstance(self.context.get("analysis_audit"), dict):
             msg = "文案分析完成（降级兜底）"
-        await callback_web(self.job_data | {"title": title, "summary": summary}, status="processing", progress=20, stage_message=msg, analysis_audit=self.context.get("analysis_audit") if isinstance(self.context.get("analysis_audit"), dict) else None)
+        await callback_web(self.job_data | {"title": title, "summary": summary, "video_desc": video_desc}, status="processing", progress=20, stage_message=msg, analysis_audit=self.context.get("analysis_audit") if isinstance(self.context.get("analysis_audit"), dict) else None)
 
     async def _step_slides(self):
         # Implementation for image_text post_type
@@ -640,8 +641,10 @@ class VideoPipeline:
         if not mp4_url:
             logger.error(f"mp4_url is None for job {self.job_id}, video may not have uploaded")
         
+        summary = analysis.get("summary", "")
+        video_desc = analysis.get("video_desc", "")
         await callback_web(
-            self.job_data | {"title": title}, 
+            self.job_data | {"title": title, "summary": summary, "video_desc": video_desc}, 
             status="done", 
             stage="done",
             progress=100, 
@@ -677,6 +680,7 @@ class VideoPipeline:
         base_segments = self.context.get("base_segments", [])
         en_segments = self.context.get("en_segments", [])
         times = self.context.get("subtitle_times", [])
+        base_segments, times = expand_segments_by_sentences(base_segments, times)
         
         # Calculate offset (if cover embedded)
         t_off = 0.0
