@@ -6,6 +6,7 @@ worker/.env
 worker/.env.local
 backend/.env
 backend/.env.local
+deploy/aliyun/.env.prod
 
 # Database
 *.db
@@ -24,6 +25,13 @@ backend/venv/
 logs/
 backend/logs/
 backend/backend.log
+smoke_test.log
+
+# CI artifacts
+ci_guard_report.json
+ci_guard_summary.md
+.pids
+worker/.pids
 
 # Trae
 .trae/
