@@ -42,10 +42,23 @@ def main() -> int:
         return 1
     uid = int(reg["id"])
 
+    # 登录获取 token
+    status, _, login_resp = http_json(
+        "POST",
+        f"{base}/api/v1/auth/login",
+        {"username": u, "password": "pw"},
+    )
+    if status != 200:
+        print("login_failed", status, login_resp)
+        return 1
+    token = login_resp.get("access_token", "")
+    print(f"DEBUG: token={token[:20]}..." if token else "DEBUG: token is empty", file=sys.stderr)
+
     status, _, post = http_json(
         "POST",
         f"{base}/api/v1/posts/create",
         {"content": "hello", "post_type": "video", "user_id": uid, "custom_instructions": None, "category": None, "voice_style": None, "bgm_mood": None, "title": "t"},
+        headers={"Authorization": f"Bearer {token}"} if token else {},
     )
     if status != 200:
         print("create_post_failed", status, post)

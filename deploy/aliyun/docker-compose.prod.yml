@@ -62,6 +62,7 @@ services:
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      VIDEO_BG_MODE: api
     depends_on:
       db:
         condition: service_healthy
@@ -79,17 +80,21 @@ services:
       WORKER_SECRET: ${WORKER_SECRET:?set WORKER_SECRET}
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/1
+      # Explicitly pass these from .env.prod
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       COVER_WAN_API_KEY: ${COVER_WAN_API_KEY:-}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      PIXABAY_API_KEY: ${PIXABAY_API_KEY:-}
+      PEXELS_API_KEY: ${PEXELS_API_KEY:-}
       FFMPEG_HW_ACCEL: ${FFMPEG_HW_ACCEL:-libx264}
       R2_ENDPOINT_URL: ${R2_ENDPOINT_URL:-}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      VIDEO_BG_MODE: api
     volumes:
       - ../../worker/app:/app/app
       - ../../worker/data:/app/data

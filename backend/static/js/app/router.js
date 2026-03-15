@@ -88,7 +88,11 @@ Object.assign(window.app, {
             if (!opts || !opts.skipProfileLoad) this.loadProfile(this.state.user.id);
         }
         if (page === 'search') {
-            // Search logic is handled by searchUser or specific loaders
+            try {
+                if (typeof this.searchApplyRouteParams === 'function') this.searchApplyRouteParams(this.state.pendingSearchRoute || null);
+            } catch (_) {
+            }
+            this.state.pendingSearchRoute = null;
         }
         if (page === 'settings') {
             this.settingsSelect('password');

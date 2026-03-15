@@ -1,10 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from sqlalchemy.orm import Session
 from app.api.deps import get_read_db
-from app.models.all_models import Post
-from typing import List, Optional
+from app.models.all_models import Post, AIJob, MediaAsset
+from typing import List, Optional, Any
 from pydantic import BaseModel
 import time
+import json
+import secrets
+import base64
+from datetime import datetime
 
 router = APIRouter()
 
@@ -23,9 +27,27 @@ class SearchResult(BaseModel):
     video_url: Optional[str]
     images: Optional[List[str]]
     category: Optional[str]
+    cover_metrics: Optional[Any] = None
+    subtitle_audit: Optional[Any] = None
+    generation_quality: Optional[Any] = None
+    analysis_audit: Optional[Any] = None
     
     class Config:
         orm_mode = True
+
+
+class SearchShareViewsCreateReq(BaseModel):
+    code: str
+
+
+class SearchShareViewsCreateResp(BaseModel):
+    key: str
+    expires_at_ms: int
+
+
+class SearchShareViewsResolveResp(BaseModel):
+    code: str
+    expires_at_ms: int
 
 
 _SEARCH_POSTS_POLICY_CACHE_AT = 0.0
@@ -80,6 +102,173 @@ def _search_posts_policy():
     return val
 
 
+def _decode_share_code_payload(raw_code: str):
+    code = str(raw_code or "").strip()
+    if not code or not code.startswith("SV1."):
+        return None
+    try:
+        b64url = code[4:]
+        b64 = b64url.replace("-", "+").replace("_", "/")
+        pad_len = (4 - (len(b64) % 4)) % 4
+        padded = b64 + ("=" * pad_len)
+        txt = base64.b64decode(padded.encode("utf-8")).decode("utf-8")
+        parsed = json.loads(txt or "{}")
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    if str(parsed.get("schema") or "") != "search_history_views_share_v1":
+        return None
+    views = parsed.get("views")
+    if not isinstance(views, list) or not views:
+        return None
+    try:
+        issued_at_ms = int(parsed.get("issued_at_ms") or 0)
+        expires_at_ms = int(parsed.get("expires_at_ms") or 0)
+    except Exception:
+        return None
+    if issued_at_ms <= 0 or expires_at_ms <= 0 or expires_at_ms < issued_at_ms:
+        return None
+    parsed["issued_at_ms"] = issued_at_ms
+    parsed["expires_at_ms"] = expires_at_ms
+    return parsed
+
+
+def _record_share_metric(event: str, share_key: str = "", detail: str = ""):
+    ev = str(event or "").strip().lower()
+    if not ev:
+        return
+    try:
+        from app.core.cache import cache
+    except Exception:
+        return
+    try:
+        cache.hincrby("search:share:views:metrics:total", ev, 1, ttl=45 * 24 * 3600)
+        day = datetime.utcnow().strftime("%Y%m%d")
+        cache.hincrby(f"search:share:views:metrics:day:{day}", ev, 1, ttl=45 * 24 * 3600)
+    except Exception:
+        pass
+    try:
+        r = cache.redis()
+        if not r:
+            return
+        payload = {
+            "ts": int(time.time()),
+            "event": ev,
+            "key": str(share_key or "").strip()[:80],
+            "detail": str(detail or "").strip()[:120],
+        }
+        raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        rk = "search:share:views:metrics:samples"
+        r.lpush(rk, raw)
+        r.ltrim(rk, 0, 199)
+        r.expire(rk, 45 * 24 * 3600)
+    except Exception:
+        pass
+
+
+@router.post("/share-views", response_model=SearchShareViewsCreateResp)
+def create_search_share_views_short(req: SearchShareViewsCreateReq):
+    code = str(req.code or "").strip()
+    if not code:
+        _record_share_metric("create_empty", detail="400")
+        raise HTTPException(status_code=400, detail="empty_code")
+    if len(code) > 20000:
+        _record_share_metric("create_too_long", detail="400")
+        raise HTTPException(status_code=400, detail="code_too_long")
+    payload = _decode_share_code_payload(code)
+    if not payload:
+        _record_share_metric("create_invalid", detail="400")
+        raise HTTPException(status_code=400, detail="invalid_code")
+    now_ms = int(time.time() * 1000)
+    expires_at_ms = int(payload.get("expires_at_ms") or 0)
+    ttl_sec = int((expires_at_ms - now_ms) / 1000)
+    if ttl_sec <= 0:
+        _record_share_metric("create_expired", detail="400")
+        raise HTTPException(status_code=400, detail="expired_code")
+    if ttl_sec > 7 * 24 * 3600:
+        ttl_sec = 7 * 24 * 3600
+    try:
+        from app.core.cache import cache, stable_sig
+    except Exception:
+        _record_share_metric("create_cache_unavailable", detail="503")
+        raise HTTPException(status_code=503, detail="cache_unavailable")
+    if not cache.redis_enabled():
+        _record_share_metric("create_cache_unavailable", detail="503")
+        raise HTTPException(status_code=503, detail="cache_unavailable")
+    alias_key = f"search:share:views:alias:v1:{stable_sig(['share_views', code])}"
+    try:
+        alias = cache.get_json(alias_key)
+        if isinstance(alias, dict):
+            ex_key = str(alias.get("key") or "").strip()
+            if ex_key:
+                ex_payload = cache.get_json(f"search:share:views:v1:{ex_key}")
+                if isinstance(ex_payload, dict):
+                    ex_code = str(ex_payload.get("code") or "").strip()
+                    ex_exp = int(ex_payload.get("expires_at_ms") or 0)
+                    if ex_code == code and ex_exp > now_ms:
+                        _record_share_metric("create_reused", share_key=ex_key, detail="200")
+                        return {"key": ex_key, "expires_at_ms": ex_exp}
+    except Exception:
+        pass
+    store = {"code": code, "expires_at_ms": expires_at_ms, "created_at_ms": now_ms}
+    encoded = json.dumps(store, ensure_ascii=False)
+    for _ in range(8):
+        key = secrets.token_urlsafe(6).replace("=", "")
+        if len(key) > 16:
+            key = key[:16]
+        redis_key = f"search:share:views:v1:{key}"
+        try:
+            if cache.set_nx(redis_key, encoded, ttl=ttl_sec):
+                try:
+                    cache.set_json(alias_key, {"key": key}, ttl=ttl_sec)
+                except Exception:
+                    pass
+                _record_share_metric("create_ok", share_key=key, detail="200")
+                return {"key": key, "expires_at_ms": expires_at_ms}
+        except Exception:
+            _record_share_metric("create_cache_unavailable", detail="503")
+            raise HTTPException(status_code=503, detail="cache_unavailable")
+    _record_share_metric("create_failed", detail="503")
+    raise HTTPException(status_code=503, detail="short_link_create_failed")
+
+
+@router.get("/share-views/{share_key}", response_model=SearchShareViewsResolveResp)
+def resolve_search_share_views_short(share_key: str = Path(..., min_length=4, max_length=64)):
+    key = str(share_key or "").strip()
+    if not key:
+        _record_share_metric("resolve_invalid_key", detail="400")
+        raise HTTPException(status_code=400, detail="invalid_key")
+    if not all(ch.isalnum() or ch in "-_" for ch in key):
+        _record_share_metric("resolve_invalid_key", share_key=key, detail="400")
+        raise HTTPException(status_code=400, detail="invalid_key")
+    try:
+        from app.core.cache import cache
+    except Exception:
+        _record_share_metric("resolve_cache_unavailable", share_key=key, detail="503")
+        raise HTTPException(status_code=503, detail="cache_unavailable")
+    if not cache.redis_enabled():
+        _record_share_metric("resolve_cache_unavailable", share_key=key, detail="503")
+        raise HTTPException(status_code=503, detail="cache_unavailable")
+    redis_key = f"search:share:views:v1:{key}"
+    try:
+        payload = cache.get_json(redis_key)
+    except Exception:
+        _record_share_metric("resolve_cache_unavailable", share_key=key, detail="503")
+        raise HTTPException(status_code=503, detail="cache_unavailable")
+    if not isinstance(payload, dict):
+        _record_share_metric("resolve_not_found", share_key=key, detail="404")
+        raise HTTPException(status_code=404, detail="share_not_found")
+    code = str(payload.get("code") or "").strip()
+    expires_at_ms = int(payload.get("expires_at_ms") or 0)
+    now_ms = int(time.time() * 1000)
+    if not code or expires_at_ms <= now_ms:
+        _record_share_metric("resolve_expired", share_key=key, detail="404")
+        raise HTTPException(status_code=404, detail="share_expired")
+    _record_share_metric("resolve_ok", share_key=key, detail="200")
+    return {"code": code, "expires_at_ms": expires_at_ms}
+
+
 @router.get("/hot", response_model=List[str])
 def hot_search(limit: int = Query(10, ge=1, le=50)):
     from app.services.search_hot_service import get_hot_queries
@@ -110,6 +299,27 @@ def search_posts(
             raise HTTPException(status_code=400, detail="invalid_cursor")
     from app.services.search_service import search_post_ids
 
+    def _extract_job_observability(result_json: Any):
+        out = {"cover_metrics": None, "subtitle_audit": None, "generation_quality": None, "analysis_audit": None}
+        try:
+            if not isinstance(result_json, dict):
+                return out
+            cv = result_json.get("cover") if isinstance(result_json.get("cover"), dict) else {}
+            an = result_json.get("analysis") if isinstance(result_json.get("analysis"), dict) else {}
+            sb = result_json.get("subtitle") if isinstance(result_json.get("subtitle"), dict) else {}
+            qv = result_json.get("quality") if isinstance(result_json.get("quality"), dict) else {}
+            if isinstance(cv.get("metrics"), dict):
+                out["cover_metrics"] = cv.get("metrics")
+            if isinstance(an.get("audit"), dict):
+                out["analysis_audit"] = an.get("audit")
+            if isinstance(sb.get("audit"), dict):
+                out["subtitle_audit"] = sb.get("audit")
+            if isinstance(qv.get("generation"), dict):
+                out["generation_quality"] = qv.get("generation")
+        except Exception:
+            return out
+        return out
+
     def _build_items():
         out = search_post_ids(query, db, limit=limit, cursor=cursor)
         ids = out.get("ids") if isinstance(out, dict) else None
@@ -138,10 +348,65 @@ def search_posts(
                 Post.video_url,
                 Post.images,
                 Post.category,
+                Post.ai_job_id,
             )
             .filter(Post.status == "done", Post.id.in_(ids))
             .all()
         )
+        job_ids = []
+        for r in rows or []:
+            try:
+                jid = str(r[7] or "").strip()
+            except Exception:
+                jid = ""
+            if jid:
+                job_ids.append(jid)
+        job_obs = {}
+        if job_ids:
+            try:
+                jrows = db.query(AIJob.id, AIJob.result_json).filter(AIJob.id.in_(list(set(job_ids)))).all()
+                for jr in jrows or []:
+                    try:
+                        jid = str(jr[0] or "").strip()
+                    except Exception:
+                        jid = ""
+                    if not jid:
+                        continue
+                    job_obs[jid] = _extract_job_observability(jr[1])
+            except Exception:
+                job_obs = {}
+        media_fallback = {}
+        try:
+            post_ids = [int(r[0]) for r in (rows or []) if r and r[0] is not None]
+        except Exception:
+            post_ids = []
+        if post_ids:
+            try:
+                from app.api.v1.endpoints.posts import _infer_subtitle_quality_from_tracks
+
+                mrows = (
+                    db.query(MediaAsset.post_id, MediaAsset.subtitle_tracks, MediaAsset.id)
+                    .filter(MediaAsset.post_id.in_(list(set(post_ids))))
+                    .order_by(MediaAsset.id.desc())
+                    .all()
+                )
+                latest = {}
+                for mr in mrows or []:
+                    try:
+                        pid = int(mr[0] or 0)
+                    except Exception:
+                        pid = 0
+                    if pid <= 0:
+                        continue
+                    if pid in latest:
+                        continue
+                    latest[pid] = mr[1]
+                for pid, tracks in latest.items():
+                    sb, gq = _infer_subtitle_quality_from_tracks(tracks)
+                    if sb is not None or gq is not None:
+                        media_fallback[int(pid)] = {"subtitle_audit": sb, "generation_quality": gq}
+            except Exception:
+                media_fallback = {}
         by_id = {}
         for r in rows or []:
             try:
@@ -153,6 +418,9 @@ def search_posts(
             row = by_id.get(int(i))
             if not row:
                 continue
+            jid = str(row[7] or "").strip()
+            obs = job_obs.get(jid) or {}
+            fb = media_fallback.get(int(row[0] or 0)) or {}
             try:
                 images = list(row[5] or [])
             except Exception:
@@ -166,6 +434,10 @@ def search_posts(
                     "video_url": row[4],
                     "images": images,
                     "category": row[6],
+                    "cover_metrics": obs.get("cover_metrics"),
+                    "analysis_audit": obs.get("analysis_audit"),
+                    "subtitle_audit": obs.get("subtitle_audit") or fb.get("subtitle_audit"),
+                    "generation_quality": obs.get("generation_quality") or fb.get("generation_quality"),
                 }
             )
         return {"items": items, "next_cursor": nxt}
@@ -177,7 +449,7 @@ def search_posts(
         pol = _search_posts_policy()
         key_q_max_len = int(pol.get("key_q_max_len", 64) or 64)
         cur = str(cursor or "")
-        key = f"search:api:posts:items:v2:{stable_sig(['q', query_lc[:key_q_max_len], int(limit or 0), cur])}"
+        key = f"search:api:posts:items:v3:{stable_sig(['q', query_lc[:key_q_max_len], int(limit or 0), cur])}"
         ttl = int(pol.get("cursor_ttl", 4) if cur else pol.get("ttl", 8))
         lock_ttl = int(pol.get("cursor_lock_ttl", 1) if cur else pol.get("lock_ttl", 2))
         if ttl < 1:

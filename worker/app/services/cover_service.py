@@ -105,6 +105,28 @@ def _sanitize_cover_text(s: str) -> str:
     return t[:80]
 
 
+def _has_wan_key() -> bool:
+    key = str(getattr(settings, "cover_wan_api_key", "") or "").strip()
+    if key:
+        return True
+    return bool(
+        str(os.getenv("DASHSCOPE_API_KEY") or "").strip()
+        or str(os.getenv("COVER_WAN_API_KEY") or "").strip()
+        or str(os.getenv("WANX_API_KEY") or "").strip()
+    )
+
+
+def _has_openai_key() -> bool:
+    key = str(getattr(settings, "cover_openai_api_key", "") or "").strip()
+    if key:
+        return True
+    return bool(str(os.getenv("OPENAI_API_KEY") or "").strip())
+
+
+def has_any_ai_cover_provider() -> bool:
+    return _has_wan_key() or _has_openai_key()
+
+
 def build_cover_plan(analysis: dict, *, fallback_title: str = "", fallback_summary: str = "", orientation: str = "portrait") -> CoverPlan:
     title_text = ""
     subtitle_text = ""
@@ -126,9 +148,15 @@ def build_cover_plan(analysis: dict, *, fallback_title: str = "", fallback_summa
     ori = str(orientation or "").strip().lower() or "portrait"
     if ori not in {"portrait", "landscape"}:
         ori = "portrait"
+    title_s = _sanitize_cover_text(title_text).strip("，。！？；：,.!?;:")
+    subtitle_s = _sanitize_cover_text(subtitle_text).strip("，。！？；：,.!?;:")
+    if len(title_s) > 18:
+        title_s = title_s[:18].strip()
+    if len(subtitle_s) > 24:
+        subtitle_s = subtitle_s[:24].strip()
     return CoverPlan(
-        title_text=_sanitize_cover_text(title_text),
-        subtitle_text=_sanitize_cover_text(subtitle_text),
+        title_text=title_s,
+        subtitle_text=subtitle_s,
         visual_prompt_en=str(visual_prompt_en)[:220],
         orientation=ori,
     )
@@ -200,124 +228,118 @@ def _openai_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optiona
 
 
 def _wanx_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optional[str]:
-    # Try all possible env vars for key
-    key = str(getattr(settings, "cover_wan_api_key", "") or "").strip() 
+    """Generate cover using 通义万相 wan2.6-t2i (multimodal-generation API)."""
+    key = str(getattr(settings, "cover_wan_api_key", "") or "").strip()
     if not key:
         key = str(os.getenv("DASHSCOPE_API_KEY") or "").strip()
     if not key:
         key = str(os.getenv("COVER_WAN_API_KEY") or "").strip()
     if not key:
-        # Final fallback for hardcoded key if needed or from alternate location
         key = str(os.getenv("WANX_API_KEY") or "").strip()
-        
+
     if not key:
         trace.append({"t": "provider_skip", "p": "wanx", "reason": "no_key"})
         return None
-    
-    # Check circuit breaker
+
     if _cb_open("wanx"):
         trace.append({"t": "provider_skip", "p": "wanx", "reason": "circuit_open"})
         return None
 
-    # Construct API URL
     base = str(getattr(settings, "cover_wan_base_url", "https://dashscope.aliyuncs.com") or "").rstrip("/")
     if base.endswith("/api/v1"):
         base = base[: -len("/api/v1")]
-    
-    # Use the correct endpoint for Wanx T2I
-    url = f"{base}/api/v1/services/aigc/text2image/image-synthesis"
-    
-    req = "9:16竖屏" if str(plan.orientation) != "landscape" else "16:9横屏"
-    size = "1024*1792" if str(plan.orientation) != "landscape" else "1792*1024"
-    
-    # Enhanced prompt for better quality
+
+    url = f"{base}/api/v1/services/aigc/multimodal-generation/generation"
+    model = str(getattr(settings, "cover_wan_model", "wan2.6-t2i") or "wan2.6-t2i")
+
+    size = "1024*1536" if str(plan.orientation) != "landscape" else "1536*1024"
     prompt = (
-        f"一张高质量的短视频封面图，{req}。"
+        f"一张高质量的短视频封面图，{'9:16竖屏' if str(plan.orientation) != 'landscape' else '16:9横屏'}。"
         f"主标题文字：{plan.title_text}。"
         f"画面描述：{plan.visual_prompt_en}。"
         f"风格：{plan.style}，高清晰度，电影质感，色彩鲜艳，构图完美，无模糊，无水印。"
     )
-    
-    # Wanx specific payload structure
+    negative_prompt = "模糊，低质量，文字扭曲，水印，logo，变形"
+
     payload = {
-        "model": "wanx-v1", 
+        "model": model,
         "input": {
-            "prompt": prompt
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
         },
         "parameters": {
-            "style": "<auto>",
             "size": size,
-            "n": 1
-        }
+            "n": 1,
+            "num_inference_steps": 30,
+            "guidance_scale": 7.5,
+            "style": "<photorealistic>",
+        },
     }
-    
+
     out_dir = OUTPUTS_DIR / "covers" / str(job_id) / str(uuid.uuid4())
     out_dir.mkdir(parents=True, exist_ok=True)
     out_img = out_dir / "cover.png"
-    
+
     try:
         headers = {
-            "Authorization": f"Bearer {key}", 
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
-            "X-DashScope-Async": "enable" # Use async mode if needed, but here we try sync first
         }
-        
+
         t0 = time.time()
-        
-        # Call API
-        with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
+        with httpx.Client(timeout=httpx.Timeout(60.0, connect=5.0)) as client:
             resp = client.post(url, headers=headers, json=payload)
-            
+
         if resp.status_code != 200:
-            trace.append({"t": "provider_fail", "p": "wanx", "reason": f"http_status:{resp.status_code}", "body": resp.text[:200]})
+            trace.append({
+                "t": "provider_fail", "p": "wanx",
+                "reason": f"http_status:{resp.status_code}", "body": resp.text[:200],
+            })
             _cb_fail("wanx", hard=False)
             return None
-            
+
         js = resp.json()
-        
-        # Check output
-        # Wanx async task response structure: {"output": {"task_id": "..."}}
-        # Wanx sync task response structure: {"output": {"results": [...]}}
-        
+
+        if "code" in js and js.get("code"):
+            trace.append({
+                "t": "provider_fail", "p": "wanx",
+                "reason": js.get("message", str(js))[:200],
+            })
+            _cb_fail("wanx", hard=False)
+            return None
+
         task_id = None
         if isinstance(js.get("output"), dict):
             task_id = js.get("output", {}).get("task_id")
-            
+
         if task_id:
-             # Poll for result (more robust polling)
-             # Wait up to 120 seconds (40 * 3s)
-             start_poll = time.time()
-             poll_attempts = 0
-             while time.time() - start_poll < 120:
-                 poll_attempts += 1
-                 time.sleep(3)
-                 task_url = f"{base}/api/v1/tasks/{task_id}"
-                 try:
-                     with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
-                         r_task = client.get(task_url, headers={"Authorization": f"Bearer {key}"})
-                         if r_task.status_code != 200:
-                             continue
-                         js_task = r_task.json()
-                         
-                         status = js_task.get("output", {}).get("task_status")
-                         # Log polling status occasionally
-                         if poll_attempts % 5 == 0:
-                             trace.append({"t": "wanx_poll", "status": status, "attempt": poll_attempts})
-                             
-                         if status == "SUCCEEDED":
-                             js = js_task
-                             break
-                         if status == "FAILED":
-                             trace.append({"t": "provider_fail", "p": "wanx", "reason": "task_failed", "resp": str(js_task)[:200]})
-                             return None
-                         # If PENDING or RUNNING, continue waiting
-                 except Exception as e:
-                     # Log exception but continue polling
-                     if poll_attempts % 5 == 0:
-                         trace.append({"t": "wanx_poll_error", "err": str(e)[:100]})
-                     continue
-        
-        # Extract image URL
+            start_poll = time.time()
+            poll_attempts = 0
+            while time.time() - start_poll < 120:
+                poll_attempts += 1
+                time.sleep(3)
+                task_url = f"{base}/api/v1/tasks/{task_id}"
+                try:
+                    with httpx.Client(timeout=httpx.Timeout(15.0)) as client:
+                        r_task = client.get(task_url, headers={"Authorization": f"Bearer {key}"})
+                    if r_task.status_code != 200:
+                        continue
+                    js_task = r_task.json()
+                    status = js_task.get("output", {}).get("task_status")
+                    if poll_attempts % 5 == 0:
+                        trace.append({"t": "wanx_poll", "status": status, "attempt": poll_attempts})
+                    if status == "SUCCEEDED":
+                        js = js_task
+                        break
+                    if status == "FAILED":
+                        trace.append({"t": "provider_fail", "p": "wanx", "reason": "task_failed"})
+                        _cb_fail("wanx", hard=False)
+                        return None
+                except Exception as e:
+                    if poll_attempts % 5 == 0:
+                        trace.append({"t": "wanx_poll_error", "err": str(e)[:100]})
+                    continue
+
         img_url = None
         try:
             results = js.get("output", {}).get("results", [])
@@ -325,23 +347,24 @@ def _wanx_generate(job_id: str, plan: CoverPlan, trace: list[dict]) -> Optional[
                 img_url = results[0].get("url")
         except Exception:
             pass
-            
+
         if not img_url:
-             trace.append({"t": "provider_fail", "p": "wanx", "reason": "no_image_url", "resp": str(js)[:200]})
-             return None
-             
-        # Download image
+            trace.append({"t": "provider_fail", "p": "wanx", "reason": "no_image_url"})
+            _cb_fail("wanx", hard=False)
+            return None
+
         with httpx.Client(timeout=httpx.Timeout(30.0)) as client:
             r_img = client.get(img_url)
-            if r_img.status_code == 200:
-                out_img.write_bytes(r_img.content)
-                dt = int(round((time.time() - t0) * 1000))
-                if out_img.exists() and out_img.stat().st_size > 1000:
-                    trace.append({"t": "provider_ok", "p": "wanx", "ms": dt, "path": str(out_img)})
-                    _cb_success("wanx")
-                    return str(out_img)
-        
+        if r_img.status_code == 200:
+            out_img.write_bytes(r_img.content)
+            dt = int(round((time.time() - t0) * 1000))
+            if out_img.exists() and out_img.stat().st_size > 1000:
+                trace.append({"t": "provider_ok", "p": "wanx", "ms": dt, "path": str(out_img)})
+                _cb_success("wanx")
+                return str(out_img)
+
         trace.append({"t": "provider_fail", "p": "wanx", "reason": "download_failed"})
+        _cb_fail("wanx", hard=False)
         return None
 
     except Exception as e:
@@ -356,6 +379,17 @@ class CoverService:
         order = [str(x or "").strip().lower() for x in (getattr(settings, "cover_provider_order", None) or []) if str(x or "").strip()]
         if not order:
             order = ["wanx", "openai", "frame"]
+        if bool(getattr(settings, "cover_fast_degrade_no_key", True)):
+            has_wan = _has_wan_key()
+            has_openai = _has_openai_key()
+            if not has_wan and not has_openai:
+                trace.append({"t": "cover_short_circuit", "reason": "all_ai_no_key"})
+                for p in order:
+                    if p in {"wanx", "openai"}:
+                        trace.append({"t": "provider_skip", "p": p, "reason": "no_key"})
+                    if p == "frame":
+                        trace.append({"t": "provider_defer", "p": "frame"})
+                return CoverResult(ok=False, provider="none", image_path=None, trace=trace)
         for p in order:
             if p == "wanx":
                 path = _wanx_generate(job_id, plan, trace)

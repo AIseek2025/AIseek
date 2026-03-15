@@ -1,6 +1,7 @@
 (function () {
     if (window.__aiseekActionDispatcher) return;
     window.__aiseekActionDispatcher = true;
+    window.__aiseekActionDispatcherVersion = 'sub-cover-fix-20260315';
 
     const safeJson = (s, fallback) => {
         try {
@@ -353,6 +354,13 @@
         try {
             const t = ev && ev.target ? ev.target : null;
             if (!t || !t.closest) return;
+            const isControlTarget = (() => {
+                try {
+                    return !!(t.closest && t.closest('button,.btn,[role="button"],.drag-handle,.status-pill,.p-del,input,textarea,select,option,a'));
+                } catch (_) {
+                    return false;
+                }
+            })();
             const attr = key === 'click' ? 'data-action' : `data-action-${key}`;
             const el = t.closest(`[${attr}]`);
             if (!el) return;
@@ -373,13 +381,32 @@
                 if (k && String(ev && ev.key) !== k) return;
                 if (asBool(el.dataset.noShift) && !!(ev && ev.shiftKey)) return;
             }
-            if (prevent) ev.preventDefault();
+            const allowSelection = (key === 'pointerdown' || key === 'mousedown' || key === 'selectstart') && !isControlTarget;
+            if (prevent && !allowSelection) ev.preventDefault();
             if (stop && !isStopAction) ev.stopPropagation();
 
             const name = actName;
             const fn = actions[name];
             if (typeof fn !== 'function') return;
-            const r = fn(el, ev);
+            let rawPrevent = null;
+            if (allowSelection && ev && typeof ev.preventDefault === 'function') {
+                try {
+                    rawPrevent = ev.preventDefault.bind(ev);
+                    ev.preventDefault = () => {};
+                } catch (_) {
+                }
+            }
+            let r;
+            try {
+                r = fn(el, ev);
+            } finally {
+                if (rawPrevent) {
+                    try {
+                        ev.preventDefault = rawPrevent;
+                    } catch (_) {
+                    }
+                }
+            }
             emit('ui:action', { action: name, fn: el.dataset.fn || null });
             return true;
         } catch (e) {

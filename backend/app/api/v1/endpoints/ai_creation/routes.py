@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.all_models import AIJob, Post
-from app.tasks.ai_creation import run_ai_pipeline
 from app.core.config import get_settings
 
 router = APIRouter()
@@ -54,12 +53,14 @@ async def create_ai_job(req: AICreateRequest):
     db: Session = SessionLocal()
     post_id = None
     try:
+        from app.api.v1.endpoints.ai_jobs import _build_fallback_draft, _sanitize_rerun_draft
+
         # Create Post first
         post = Post(
             user_id=req.user_id,
             content_text=req.long_text,
             post_type="video",
-            status="processing",
+            status="queued",
             category=req.category,
             custom_instructions=req.prompt,
             download_enabled=True,
@@ -69,12 +70,23 @@ async def create_ai_job(req: AICreateRequest):
         db.flush() # get ID
         post_id = post.id
 
+        fallback_draft = _sanitize_rerun_draft(_build_fallback_draft(str(req.long_text or ""), "AI Generated Video"))
         job = AIJob(
             id=job_id, 
             user_id=req.user_id, 
             post_id=post_id,
             status="queued", 
-            progress=0
+            progress=0,
+            kind="generate",
+            stage="dispatch_pending",
+            stage_message="等待派发",
+            input_json={
+                "post_type": "video",
+                "content": str(req.long_text or ""),
+                "custom_instructions": req.prompt,
+                "subtitle_mode": "zh",
+            },
+            draft_json=fallback_draft,
         )
         db.add(job)
         
@@ -92,20 +104,20 @@ async def create_ai_job(req: AICreateRequest):
             pass
 
     try:
-        from app.core.celery_app import apply_async_with_context
-        from app.tasks.ai_creation import generate_video
+        from app.services.queue_service import send_worker_task
 
-        task_kwargs = {
-            "job_id": job_id,
-            "post_id": str(post_id) if post_id else None,
-            "content": req.long_text,
-            "user_id": str(req.user_id),
-            "custom_instructions": req.prompt,
-            "post_type": "video",
-        }
-        print(f"DEBUG: Sending task generate_video to queue 'ai' with kwargs: {task_kwargs}")
-        res = apply_async_with_context(generate_video, kwargs=task_kwargs, queue="ai")
-        print(f"DEBUG: Task sent result: {res}")
+        task_id = send_worker_task(
+            "generate_video",
+            args=[str(job_id), str(req.long_text or ""), str(req.user_id)],
+            kwargs={
+                "post_id": int(post_id) if post_id else None,
+                "custom_instructions": req.prompt,
+                "post_type": "video",
+                "subtitle_mode": "zh",
+                "draft_json": getattr(job, "draft_json", None),
+            },
+        )
+        print(f"INFO: queued generate_video task_id={task_id} job_id={job_id}")
     except Exception as e:
         print(f"ERROR: Failed to send task: {e}")
         import traceback
@@ -122,11 +134,21 @@ async def get_job_status(job_id: str):
         job = db.query(AIJob).filter(AIJob.id == job_id).first()
         if not job:
             return {"job_id": job_id, "status": "not_found", "progress": 0}
+        result = job.result_json if isinstance(job.result_json, dict) else {}
+        try:
+            from app.api.v1.endpoints.ai_jobs import _resolve_best_script_for_job
+            post = db.query(Post).filter(Post.id == int(getattr(job, "post_id", 0) or 0)).first()
+            ps = _resolve_best_script_for_job(db, job, post)
+            if isinstance(ps, dict) and ps:
+                result = dict(result)
+                result["production_script"] = ps
+        except Exception:
+            pass
         return {
             "job_id": job_id,
             "status": job.status,
             "progress": job.progress or 0,
-            "result": job.result_json,
+            "result": result if isinstance(result, dict) else job.result_json,
             "error": job.error,
         }
     finally:

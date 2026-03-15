@@ -8,6 +8,7 @@ from sqlalchemy import or_
 from datetime import datetime
 import uuid
 import subprocess
+import re
 from pathlib import Path
 
 from app.core.cache import cache
@@ -16,6 +17,58 @@ from app.services.feed_service import get_feed as get_feed_service
 from app.services.post_presenter import decorate_flags, serialize_post_base
 
 router = APIRouter()
+
+
+def _tight_line(s: str, max_len: int) -> str:
+    t = re.sub(r"\s+", " ", str(s or "").strip())
+    if not t:
+        return ""
+    if len(t) <= int(max_len):
+        return t
+    parts = re.split(r"[，。！？；,.!?;:：]\s*", t)
+    out = ""
+    for p in parts:
+        p = str(p or "").strip()
+        if not p:
+            continue
+        cand = (out + ("，" if out else "") + p).strip()
+        if len(cand) <= int(max_len):
+            out = cand
+        else:
+            if not out:
+                out = p[: int(max_len)]
+            break
+    if not out:
+        out = t[: int(max_len)]
+    return out.strip("，。！？；：,.!?;:")
+
+
+def _sanitize_callback_draft(draft_json: Any) -> Any:
+    if not isinstance(draft_json, dict):
+        return draft_json
+    out = dict(draft_json)
+    scenes = out.get("scenes") if isinstance(out.get("scenes"), list) else []
+    fixed = []
+    for s in scenes:
+        if not isinstance(s, dict):
+            continue
+        s2 = dict(s)
+        nar = _tight_line(str(s2.get("narration") or ""), 58)
+        sub = _tight_line(str(s2.get("subtitle") or ""), 22)
+        if not sub:
+            sub = _tight_line(nar, 22)
+        s2["narration"] = nar
+        s2["subtitle"] = sub
+        fixed.append(s2)
+    if fixed:
+        out["scenes"] = fixed
+    cov = out.get("cover") if isinstance(out.get("cover"), dict) else None
+    if isinstance(cov, dict):
+        c2 = dict(cov)
+        c2["title_text"] = _tight_line(str(c2.get("title_text") or ""), 18)
+        c2["subtitle_text"] = _tight_line(str(c2.get("subtitle_text") or ""), 24)
+        out["cover"] = c2
+    return out
 
 
 def _probe_local_video_duration_sec(source_url: Optional[str]) -> Optional[int]:
@@ -152,10 +205,209 @@ class CallbackData(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
     subtitle_tracks: Optional[Any] = None
+    analysis_audit: Optional[Any] = None
+    subtitle_audit: Optional[Any] = None
+    generation_quality: Optional[Any] = None
     placeholder_trace: Optional[Any] = None
     placeholder_audit: Optional[Any] = None
     cover_trace: Optional[Any] = None
     cover_audit: Optional[Any] = None
+
+
+def _build_cover_metrics(trace: Any, audit: Any) -> dict:
+    out = {
+        "provider": "",
+        "provider_ms": {},
+        "total_provider_ms": 0,
+        "degrade_count": 0,
+        "skip_no_key_count": 0,
+        "provider_fail_count": 0,
+        "short_circuit": False,
+    }
+    items = trace if isinstance(trace, list) else []
+    for it in items[-300:]:
+        if not isinstance(it, dict):
+            continue
+        t = str(it.get("t") or "")
+        p = str(it.get("p") or "")
+        if t == "provider_ok" and p:
+            try:
+                ms = int(it.get("ms") or 0)
+            except Exception:
+                ms = 0
+            if ms > 0:
+                out["provider_ms"][p] = ms
+            out["provider"] = p
+        elif t == "provider_fail":
+            out["provider_fail_count"] = int(out.get("provider_fail_count", 0) or 0) + 1
+        elif t == "provider_skip" and str(it.get("reason") or "") == "no_key":
+            out["skip_no_key_count"] = int(out.get("skip_no_key_count", 0) or 0) + 1
+        elif t == "cover_short_circuit":
+            out["short_circuit"] = True
+        elif t in {"provider_defer", "cover_fallback", "defer_no_key"}:
+            out["degrade_count"] = int(out.get("degrade_count", 0) or 0) + 1
+    if isinstance(audit, dict):
+        ap = str(audit.get("provider") or "").strip()
+        if ap and not out.get("provider"):
+            out["provider"] = ap
+        at = str(audit.get("type") or "").strip().lower()
+        if at in {"defer_no_key", "fallback", "frame_fallback"}:
+            out["degrade_count"] = max(1, int(out.get("degrade_count", 0) or 0))
+    if out.get("short_circuit"):
+        out["degrade_count"] = max(1, int(out.get("degrade_count", 0) or 0))
+    try:
+        out["total_provider_ms"] = int(sum(int(v or 0) for v in (out.get("provider_ms") or {}).values()))
+    except Exception:
+        out["total_provider_ms"] = 0
+    return out
+
+
+def _vtt_ts_sec(s: str) -> float:
+    t = str(s or "").strip()
+    if not t:
+        return 0.0
+    t = t.replace(",", ".")
+    arr = t.split(":")
+    if len(arr) != 3:
+        return 0.0
+    try:
+        h = float(arr[0])
+        m = float(arr[1])
+        sec = float(arr[2])
+        return max(0.0, h * 3600.0 + m * 60.0 + sec)
+    except Exception:
+        return 0.0
+
+
+def _infer_subtitle_quality_from_tracks(tracks: Any) -> tuple[Optional[dict], Optional[dict]]:
+    arr = tracks if isinstance(tracks, list) else []
+    langs: dict = {}
+    for it in arr[:6]:
+        if not isinstance(it, dict):
+            continue
+        url = str(it.get("url") or "").strip()
+        lang = str(it.get("lang") or "").strip() or "unknown"
+        if not url.startswith("/static/"):
+            continue
+        p = Path(__file__).resolve().parents[4] / "static" / url[len("/static/") :]
+        if not p.exists() or (not p.is_file()):
+            continue
+        try:
+            txt = p.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            continue
+        lines = txt.splitlines()
+        cues = []
+        i = 0
+        while i < len(lines):
+            line = str(lines[i] or "").strip()
+            if "-->" not in line:
+                i += 1
+                continue
+            try:
+                left, right = line.split("-->", 1)
+            except Exception:
+                i += 1
+                continue
+            st = _vtt_ts_sec(left.strip())
+            ed = _vtt_ts_sec(str(right).strip().split(" ")[0])
+            i += 1
+            texts = []
+            while i < len(lines):
+                cur = str(lines[i] or "")
+                if not cur.strip():
+                    break
+                if "-->" in cur:
+                    break
+                if str(cur.strip()).isdigit():
+                    i += 1
+                    continue
+                texts.append(cur.rstrip("\n").strip())
+                i += 1
+            body = "\n".join([x for x in texts if x])
+            if body and ed > st:
+                cues.append((st, ed, body))
+            i += 1
+        if not cues:
+            continue
+        max_line = 0
+        cps_vals = []
+        dense = 0
+        for st, ed, body in cues:
+            seg_lines = [x.strip() for x in str(body).split("\n") if x.strip()] or [str(body)]
+            ln = max(len(x) for x in seg_lines)
+            max_line = max(max_line, ln)
+            dur = max(0.1, float(ed) - float(st))
+            cps = float(len("".join(seg_lines))) / dur
+            cps_vals.append(cps)
+            if cps > 8.0:
+                dense += 1
+        avg_cps = float(sum(cps_vals)) / float(max(1, len(cps_vals)))
+        dense_ratio = float(dense) / float(max(1, len(cues)))
+        score = 100.0 - max(0.0, float(max_line - 22) * 2.2) - max(0.0, (avg_cps - 8.0) * 8.0) - dense_ratio * 25.0
+        score_i = int(max(0.0, min(100.0, round(score))))
+        grade = "A" if score_i >= 90 else "B" if score_i >= 78 else "C" if score_i >= 62 else "D"
+        langs[lang] = {
+            "cue_count": int(len(cues)),
+            "max_line_len": int(max_line),
+            "avg_cps": round(avg_cps, 3),
+            "dense_ratio": round(dense_ratio, 3),
+            "score": int(score_i),
+            "grade": grade,
+            "source": "backend_vtt_infer",
+        }
+    if not langs:
+        return None, None
+    best = None
+    for _, q in langs.items():
+        if best is None or int(q.get("score") or 0) > int(best.get("score") or 0):
+            best = q
+    subtitle_audit = {"langs": langs, "best": best, "source": "backend_vtt_infer"}
+    generation_quality = {
+        "subtitle_quality_score": int((best or {}).get("score") or 0),
+        "subtitle_quality_grade": str((best or {}).get("grade") or "D"),
+        "source": "backend_vtt_infer",
+    }
+    return subtitle_audit, generation_quality
+
+
+def _extract_observability_from_result(result_json: Any) -> dict:
+    out = {
+        "cover_metrics": None,
+        "cover_audit": None,
+        "placeholder_audit": None,
+        "analysis_audit": None,
+        "subtitle_audit": None,
+        "generation_quality": None,
+        "cover_trace_len": 0,
+        "placeholder_trace_len": 0,
+    }
+    try:
+        res = result_json if isinstance(result_json, dict) else {}
+        ph = res.get("placeholder") if isinstance(res.get("placeholder"), dict) else {}
+        cv = res.get("cover") if isinstance(res.get("cover"), dict) else {}
+        if isinstance(cv.get("metrics"), dict):
+            out["cover_metrics"] = cv.get("metrics")
+        if isinstance(cv.get("audit"), dict):
+            out["cover_audit"] = cv.get("audit")
+        if isinstance(ph.get("audit"), dict):
+            out["placeholder_audit"] = ph.get("audit")
+        an = res.get("analysis") if isinstance(res.get("analysis"), dict) else {}
+        if isinstance(an.get("audit"), dict):
+            out["analysis_audit"] = an.get("audit")
+        sb = res.get("subtitle") if isinstance(res.get("subtitle"), dict) else {}
+        if isinstance(sb.get("audit"), dict):
+            out["subtitle_audit"] = sb.get("audit")
+        qv = res.get("quality") if isinstance(res.get("quality"), dict) else {}
+        if isinstance(qv.get("generation"), dict):
+            out["generation_quality"] = qv.get("generation")
+        if isinstance(cv.get("trace"), list):
+            out["cover_trace_len"] = len(cv.get("trace"))
+        if isinstance(ph.get("trace"), list):
+            out["placeholder_trace_len"] = len(ph.get("trace"))
+    except Exception:
+        return out
+    return out
 
 
 class MediaAssetOut(BaseModel):
@@ -206,6 +458,33 @@ def _serialize_posts_base(posts: List[Post]) -> List[dict]:
     return serialize_posts_base(posts)
 
 
+def _backfill_ai_job_ids(items: List[dict], db: Session) -> None:
+    try:
+        missing_ids = [int(it.get("id")) for it in items if isinstance(it, dict) and int(it.get("id") or 0) > 0 and not str(it.get("ai_job_id") or "").strip()]
+        if not missing_ids:
+            return
+        rows = (
+            db.query(AIJob.post_id, AIJob.id)
+            .filter(AIJob.post_id.in_(missing_ids))
+            .order_by(AIJob.created_at.desc())
+            .all()
+        )
+        by_post = {}
+        for pid, jid in rows:
+            p = int(pid or 0)
+            if p > 0 and p not in by_post and str(jid or "").strip():
+                by_post[p] = str(jid)
+        if by_post:
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                pid = int(it.get("id") or 0)
+                if pid > 0 and not str(it.get("ai_job_id") or "").strip() and by_post.get(pid):
+                    it["ai_job_id"] = by_post.get(pid)
+    except Exception:
+        pass
+
+
 def _maybe_current_user_id(authorization: Optional[str], db: Session) -> Optional[int]:
     try:
         from app.api.v1.endpoints.users import get_current_user
@@ -252,6 +531,7 @@ def get_user_posts(
                 "id": int(last.id),
             })
     items = _serialize_posts_base(posts)
+    _backfill_ai_job_ids(items, db)
     return decorate_flags(items, viewer_id or user_id, db)
 
 
@@ -361,8 +641,13 @@ def get_post(
     post_id: int,
     user_id: Optional[int] = None,
     authorization: Optional[str] = Header(None),
+    response: Response = None,
     db: Session = Depends(get_read_db)
 ):
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     # Try to get user_id from token if not provided
     if user_id is None and authorization:
         uid = _maybe_current_user_id(authorization, db)
@@ -377,6 +662,7 @@ def get_post(
                 # Added "preview" to the allowed statuses
                 if int(user_id) == int(post0.user_id) and str(post0.status) in {"processing", "queued", "failed", "returned", "preview"}:
                     base0 = _serialize_post_base(post0)
+                    _backfill_ai_job_ids([base0], db)
                     items0 = decorate_flags([base0], user_id, db)
                     return items0[0]
     except Exception:
@@ -393,6 +679,7 @@ def get_post(
     base = cache.get_or_set_json(key, ttl=60, builder=_build)
     if not base:
         raise HTTPException(status_code=404, detail="Post not found")
+    _backfill_ai_job_ids([base], db)
     items = decorate_flags([base], user_id, db)
     return items[0]
 
@@ -824,7 +1111,7 @@ async def worker_callback(
     if st not in {"queued", "processing", "done", "failed", "cancelled"}:
         st = "failed"
 
-    st_post = "failed" if st == "cancelled" else ("preview" if st == "done" else st)
+    st_post = "failed" if st == "cancelled" else st
     try:
         def _allow_status_transition(cur: str, nxt: str) -> bool:
             c = str(cur or "").strip().lower()
@@ -861,6 +1148,14 @@ async def worker_callback(
     
     if post and data.no_post_status is not True:
         post.status = st_post
+    try:
+        if post and not getattr(post, "ai_job_id", None):
+            if job and getattr(job, "id", None):
+                post.ai_job_id = str(getattr(job, "id"))
+            elif getattr(data, "job_id", None):
+                post.ai_job_id = str(getattr(data, "job_id"))
+    except Exception:
+        pass
     try:
         if job:
             job.status = st
@@ -904,14 +1199,20 @@ async def worker_callback(
                 job.stage_message = str(data.stage_message)
             if data.draft_json is not None and not regressing and allow_draft_write(data.stage):
                 try:
-                    job.draft_json = data.draft_json
+                    dj = _sanitize_callback_draft(data.draft_json)
+                    job.draft_json = dj
+                    cur = getattr(job, "result_json", None)
+                    if not isinstance(cur, dict):
+                        cur = {}
+                    cur["production_script"] = dj
+                    job.result_json = cur
                 except Exception:
                     pass
                 try:
                     from app.models.all_models import AIJobDraftVersion
 
                     src = str(data.stage or "worker")[:64]
-                    db.add(AIJobDraftVersion(job_id=str(job.id), user_id=int(job.user_id), source=src, draft_json=data.draft_json))
+                    db.add(AIJobDraftVersion(job_id=str(job.id), user_id=int(job.user_id), source=src, draft_json=dj))
                 except Exception:
                     pass
             if data.assistant_message and not regressing and allow_assistant_message_write(data.stage):
@@ -960,6 +1261,42 @@ async def worker_callback(
                         pass
                 cv_trace = data.cover_trace
                 cv_audit = data.cover_audit
+                an_audit = data.analysis_audit
+                sb_audit = data.subtitle_audit
+                gen_quality = data.generation_quality
+                if sb_audit is None or gen_quality is None:
+                    sb2, g2 = _infer_subtitle_quality_from_tracks(data.subtitle_tracks)
+                    if sb_audit is None and sb2 is not None:
+                        sb_audit = sb2
+                    if gen_quality is None and g2 is not None:
+                        gen_quality = g2
+                if an_audit is not None:
+                    cur = getattr(job, "result_json", None)
+                    if not isinstance(cur, dict):
+                        cur = {}
+                    an = cur.get("analysis") if isinstance(cur.get("analysis"), dict) else {}
+                    an["audit"] = an_audit
+                    an["updated_at"] = datetime.utcnow().isoformat()
+                    cur["analysis"] = an
+                    job.result_json = cur
+                if sb_audit is not None:
+                    cur = getattr(job, "result_json", None)
+                    if not isinstance(cur, dict):
+                        cur = {}
+                    sb = cur.get("subtitle") if isinstance(cur.get("subtitle"), dict) else {}
+                    sb["audit"] = sb_audit
+                    sb["updated_at"] = datetime.utcnow().isoformat()
+                    cur["subtitle"] = sb
+                    job.result_json = cur
+                if gen_quality is not None:
+                    cur = getattr(job, "result_json", None)
+                    if not isinstance(cur, dict):
+                        cur = {}
+                    qv = cur.get("quality") if isinstance(cur.get("quality"), dict) else {}
+                    qv["generation"] = gen_quality
+                    qv["updated_at"] = datetime.utcnow().isoformat()
+                    cur["quality"] = qv
+                    job.result_json = cur
                 if cv_trace is not None or cv_audit is not None:
                     cur = getattr(job, "result_json", None)
                     if not isinstance(cur, dict):
@@ -972,6 +1309,7 @@ async def worker_callback(
                             cv["trace"] = cv_trace
                     if cv_audit is not None:
                         cv["audit"] = cv_audit
+                    cv["metrics"] = _build_cover_metrics(cv.get("trace"), cv.get("audit"))
                     cv["updated_at"] = datetime.utcnow().isoformat()
                     cur["cover"] = cv
                     job.result_json = cur
@@ -983,6 +1321,7 @@ async def worker_callback(
             try:
                 from app.api.v1.endpoints.ai_jobs import _append_job_event
 
+                obs_evt = _extract_observability_from_result(getattr(job, "result_json", None))
                 _append_job_event(
                     str(job.id),
                     "progress",
@@ -991,6 +1330,12 @@ async def worker_callback(
                         "progress": int(getattr(job, "progress", 0) or 0),
                         "stage": getattr(job, "stage", None),
                         "stage_message": getattr(job, "stage_message", None),
+                        "cover_metrics": obs_evt.get("cover_metrics"),
+                        "analysis_audit": obs_evt.get("analysis_audit"),
+                        "subtitle_audit": obs_evt.get("subtitle_audit"),
+                        "generation_quality": obs_evt.get("generation_quality"),
+                        "cover_trace_len": int(obs_evt.get("cover_trace_len") or 0),
+                        "placeholder_trace_len": int(obs_evt.get("placeholder_trace_len") or 0),
                     },
                 )
                 if data.assistant_message:

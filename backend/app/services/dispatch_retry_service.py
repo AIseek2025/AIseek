@@ -2,12 +2,156 @@ import asyncio
 import hashlib
 import random
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models.all_models import AIJob, Post
 from app.services.job_event_service import append_job_event
+
+
+def _read_ai_production_runtime() -> dict:
+    try:
+        from app.observability.runtime_ai_production import read_runtime_ai_production
+
+        cfg = read_runtime_ai_production()
+        return cfg if isinstance(cfg, dict) else {}
+    except Exception:
+        return {}
+
+
+def _write_ai_production_runtime(cfg: dict) -> None:
+    try:
+        from app.observability.runtime_ai_production import write_runtime_ai_production
+
+        write_runtime_ai_production(cfg if isinstance(cfg, dict) else {})
+    except Exception:
+        pass
+
+
+def _auto_release_dispatch_hold(db, rt: dict, now: datetime) -> int:
+    cfg = rt if isinstance(rt, dict) else {}
+    if not bool(cfg.get("auto_release_on_disable", True)):
+        return 0
+    batch = int(cfg.get("auto_release_batch_size", 200) or 200)
+    if batch < 1:
+        batch = 1
+    if batch > 1000:
+        batch = 1000
+    adaptive_mode = "normal"
+    fail_ratio = 0.0
+    if bool(cfg.get("auto_release_adaptive_enabled", True)):
+        ratio_thr = float(cfg.get("auto_release_adaptive_fail_ratio", 0.35) or 0.35)
+        if ratio_thr < 0:
+            ratio_thr = 0.0
+        if ratio_thr > 1:
+            ratio_thr = 1.0
+        mul_pct = int(cfg.get("auto_release_adaptive_multiplier_pct", 50) or 50)
+        if mul_pct < 5:
+            mul_pct = 5
+        if mul_pct > 100:
+            mul_pct = 100
+        from sqlalchemy import func
+
+        rows = (
+            db.query(AIJob.stage, func.count(AIJob.id))
+            .filter(AIJob.status == "queued")
+            .filter(AIJob.stage.in_(["dispatch_pending", "dispatching", "dispatch_failed"]))
+            .group_by(AIJob.stage)
+            .all()
+        )
+        p = 0
+        d = 0
+        f = 0
+        for st, cnt in rows:
+            s = str(st or "")
+            if s == "dispatch_pending":
+                p += int(cnt or 0)
+            elif s == "dispatching":
+                d += int(cnt or 0)
+            elif s == "dispatch_failed":
+                f += int(cnt or 0)
+        den = p + d + f
+        if den > 0:
+            fail_ratio = float(f / den)
+        if fail_ratio >= ratio_thr:
+            adaptive_mode = "throttled"
+            batch = max(1, int(batch * mul_pct / 100))
+    interval_sec = int(cfg.get("auto_release_interval_sec", 15) or 15)
+    if interval_sec < 1:
+        interval_sec = 1
+    if interval_sec > 3600:
+        interval_sec = 3600
+    now_ts = int(now.timestamp())
+    last_ts = int(cfg.get("last_auto_release_ts", 0) or 0)
+    if last_ts > 0 and int(now_ts - last_ts) < interval_sec:
+        return 0
+    ids = (
+        db.query(AIJob.id)
+        .filter(AIJob.status == "queued")
+        .filter(AIJob.stage == "dispatch_hold")
+        .order_by(AIJob.updated_at.asc())
+        .limit(int(batch))
+        .all()
+    )
+    release_ids: List[str] = []
+    for row in ids:
+        jid = str(getattr(row, "id", None) or (row[0] if isinstance(row, (tuple, list)) and row else "")).strip()
+        if jid:
+            release_ids.append(jid)
+    released = 0
+    if release_ids:
+        released = int(
+            db.query(AIJob)
+            .filter(AIJob.id.in_(release_ids))
+            .filter(AIJob.status == "queued")
+            .filter(AIJob.stage == "dispatch_hold")
+            .update(
+                {
+                    AIJob.stage: "dispatch_pending",
+                    AIJob.stage_message: "等待派发",
+                    AIJob.next_dispatch_at: now,
+                },
+                synchronize_session=False,
+            )
+            or 0
+        )
+        db.commit()
+        for jid in release_ids[:released]:
+            try:
+                append_job_event(str(jid), "dispatch_released", {"reason": "auto_release_on_disable"})
+                append_job_event(str(jid), "dispatch_pending", {"reason": "auto_release_on_disable", "released": True})
+            except Exception:
+                pass
+    cfg["last_auto_release_ts"] = int(now_ts)
+    cfg["last_auto_release_count"] = int(released)
+    cfg["last_auto_release_effective_batch"] = int(batch)
+    cfg["last_auto_release_adaptive_mode"] = str(adaptive_mode)
+    cfg["last_auto_release_fail_ratio"] = float(fail_ratio)
+    arr = cfg.get("auto_release_history")
+    hist = arr if isinstance(arr, list) else []
+    hist2 = [x for x in hist if isinstance(x, dict)]
+    hist2.append(
+        {
+            "ts": int(now_ts),
+            "released": int(released),
+            "effective_batch": int(batch),
+            "fail_ratio": float(fail_ratio),
+            "mode": str(adaptive_mode),
+        }
+    )
+    if len(hist2) > 120:
+        hist2 = hist2[-120:]
+    cfg["auto_release_history"] = hist2
+    _write_ai_production_runtime(cfg)
+    return int(released)
+
+
+def _norm_cover_orientation(v) -> str:
+    s = str(v or "").strip().lower()
+    if s == "landscape":
+        return "landscape"
+    return "portrait"
 
 
 def _backoff_sec(attempt: int, base: int, max_sec: int) -> int:
@@ -42,11 +186,36 @@ def _dispatch_generate(job: AIJob, post: Post) -> str:
             "bgm_id": inp.get("bgm_id"),
             "subtitle_mode": sm,
             "requested_duration_sec": inp.get("requested_duration_sec"),
+            "cover_orientation": _norm_cover_orientation(inp.get("cover_orientation")),
             "target_sec": pf.get("target_sec"),
             "post_id": int(post.id),
             "draft_json": getattr(job, "draft_json", None),
         },
     )
+
+
+def _auto_hold_by_queue_pressure(db, rt: dict) -> dict:
+    cfg = rt if isinstance(rt, dict) else {}
+    if bool(cfg.get("dispatch_hold_enabled", False)):
+        return cfg
+    if not bool(cfg.get("auto_hold_enabled", True)):
+        return cfg
+    thr = int(cfg.get("auto_hold_queue_threshold", 2000) or 2000)
+    if thr < 10:
+        thr = 10
+    queued = int(
+        db.query(AIJob.id)
+        .filter(AIJob.status == "queued")
+        .filter(AIJob.stage.in_(["dispatch_pending", "dispatch_failed", "dispatching"]))
+        .count()
+        or 0
+    )
+    if queued < thr:
+        return cfg
+    cfg["dispatch_hold_enabled"] = True
+    cfg["dispatch_hold_reason"] = "queue_pressure_auto_hold"
+    _write_ai_production_runtime(cfg)
+    return cfg
 
 
 def dispatch_once(limit: int) -> int:
@@ -61,6 +230,27 @@ def dispatch_once(limit: int) -> int:
     stale_sec = 60
     shards = max(1, int(getattr(s, "DISPATCH_SHARDS", 1) or 1))
     shard_id = int(getattr(s, "DISPATCH_SHARD_ID", -1) or -1)
+    rt = _read_ai_production_runtime()
+    try:
+        rt = _auto_hold_by_queue_pressure(db, rt=rt)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    if bool(rt.get("dispatch_hold_enabled", False)):
+        try:
+            db.close()
+        except Exception:
+            pass
+        return 0
+    try:
+        _auto_release_dispatch_hold(db, rt=rt, now=now)
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
     try:
         ids = (
             db.query(AIJob.id)

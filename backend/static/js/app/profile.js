@@ -1,4 +1,47 @@
 Object.assign(window.app, {
+    ensureTextSelectable: function() {
+        const isControl = function(el) {
+            try {
+                return !!(el && el.closest && el.closest('button,.btn,[role="button"],.drag-handle,.p-del,.status-pill,input,textarea,select,option,a,.ai-job-actions > div'));
+            } catch (_) {
+                return false;
+            }
+        };
+        try {
+            if (!document.getElementById('aiseek_force_selectable')) {
+                const st = document.createElement('style');
+                st.id = 'aiseek_force_selectable';
+                st.textContent = `
+                    #p-header, #p-content, #p-header *, #p-content *, #ai_draft_editor, #ai_draft_editor * {
+                        -webkit-user-select: text !important;
+                        user-select: text !important;
+                    }
+                    #p-header button, #p-content button, #ai_draft_editor button,
+                    #p-header .btn-primary, #p-content .btn-primary, #ai_draft_editor .btn-primary,
+                    #p-content .p-del, #p-content .status-pill, #p-content .ai-job-actions > div {
+                        -webkit-user-select: none !important;
+                        user-select: none !important;
+                    }
+                `;
+                document.head.appendChild(st);
+            }
+        } catch (_) {
+        }
+        try {
+            document.querySelectorAll('#p-content [draggable="true"], #ai_draft_editor [draggable="true"]').forEach((el) => {
+                try { el.setAttribute('draggable', 'false'); } catch (_) {}
+            });
+        } catch (_) {
+        }
+        try {
+            document.addEventListener('selectstart', (e) => {
+                if (isControl(e.target)) return;
+                try { e.stopImmediatePropagation(); } catch (_) {}
+            }, true);
+        } catch (_) {
+        }
+    },
+
     escapeHtml: function(s) {
         const t = String(s == null ? '' : s);
         return t
@@ -471,6 +514,7 @@ Object.assign(window.app, {
     },
 
     loadProfile: async function(userId) {
+        try { this.ensureTextSelectable(); } catch (_) {}
         const header = document.getElementById('p-header');
         
         try {
@@ -689,13 +733,34 @@ Object.assign(window.app, {
         } catch(e) { console.error(e); content.innerHTML = '加载失败'; }
     },
 
+    recoverAIJobIdForPost: async function(post, card) {
+        try {
+            const uid = this.state.user ? Number(this.state.user.id || 0) : 0;
+            const pid = post ? Number(post.id || 0) : 0;
+            if (!uid || !pid) return;
+            const url = `/api/v1/ai/jobs/by_post/${encodeURIComponent(String(pid))}?user_id=${uid}`;
+            const res = await this.apiRequest('GET', url, undefined, { cancel_key: `ai:by_post:${pid}` });
+            if (!res.ok) return;
+            const data = await res.json().catch(() => null);
+            const jid = String((data && data.job_id) || '').trim();
+            if (!jid) return;
+            try { post.ai_job_id = jid; } catch (_) {}
+            try { this.bindAIStatusForCard(post, card); } catch (_) {}
+        } catch (_) {
+        }
+    },
+
     bindAIStatusForCard: function(post, card) {
         if (!post || !card) return;
         const st = String(post.status || '');
         const jid = String(post.ai_job_id || '');
         const isMe = this.state.user && this.state.viewingUser && this.state.viewingUser.user && Number(this.state.user.id) === Number(this.state.viewingUser.user.id);
         if (!isMe) return;
-        if (!jid || st === 'done') return;
+        if (!jid) {
+            try { this.recoverAIJobIdForPost(post, card); } catch (_) {}
+            return;
+        }
+        if (st === 'done') return;
         const badge = document.createElement('div');
         badge.className = 'ai-job-badge';
         badge.dataset.jobId = jid;
@@ -874,6 +939,7 @@ Object.assign(window.app, {
     },
 
     openAIDraftEditor: async function(jobId) {
+        try { this.ensureTextSelectable(); } catch (_) {}
         const jid = String(jobId || '');
         const uid = this.state.user ? Number(this.state.user.id || 0) : 0;
         if (!jid || !uid) return;

@@ -4,6 +4,14 @@
 
 当前默认运行入口为 `backend/app/main.py`（抖音风 UI）。
 
+## 文档索引
+
+- `docs/PROJECT_FULL_README_20260315.md`：项目全量技术说明（代码/架构/模块/GitHub/部署/阿里云/Docker/维护/备份）
+- `docs/README.md`：文档总入口
+- `docs/DEPLOY.md`：部署说明
+- `docs/BACKUP.md`：备份与恢复
+- `docs/SCALE.md`：扩容蓝图
+
 ## 快速开始（本地运行）
 
 ### 1) 安装依赖

@@ -126,6 +126,7 @@ class Settings(BaseSettings):
     cover_openai_api_key: Optional[str] = Field(default=None, description="OpenAI Images API key for cover generation")
     cover_openai_base_url: str = Field(default="https://api.openai.com/v1", description="OpenAI Images base URL")
     cover_openai_model: str = Field(default="gpt-image-1", description="OpenAI Images model")
+    cover_fast_degrade_no_key: bool = Field(default=True, description="Skip AI cover providers quickly when no API key is configured")
     cover_embed_duration_sec: float = Field(default=1.0, description="Duration of embedded cover segment")
     
     # ========== Validators ==========

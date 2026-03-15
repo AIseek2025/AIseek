@@ -98,6 +98,16 @@
         <!-- Dashboard Tab -->
         <div id="tab_dashboard" class="tab-content">
             <h1 class="text-2xl font-bold mb-6">平台概览</h1>
+            <div class="card">
+                <h3 class="text-lg font-bold mb-3">内容探针（首屏）</h3>
+                <div class="flex gap-2 items-center">
+                    <input id="dash_post_probe_ids" class="w-44" placeholder="探针post_id(如77,80)" value="77,80" />
+                    <button class="btn-primary" data-action="call" data-fn="runPostContentProbeDashboard" data-args="[]" style="height:30px; padding:0 10px;">运行探针</button>
+                    <button class="btn-primary" data-action="call" data-fn="togglePostContentProbeWatchDashboard" data-args="[]" style="height:30px; padding:0 10px;">自动巡检开关</button>
+                    <span id="dash_post_probe_badge" class="text-xs text-gray-300" style="padding:3px 8px; border-radius:10px; background:#374151;">UNKNOWN</span>
+                </div>
+                <pre id="dash_post_probe_out" class="text-xs text-gray-300 mt-3" style="max-height: 140px; overflow:auto; background:#151722; padding:8px; border-radius:6px;">-</pre>
+            </div>
             
             <div class="grid grid-cols-6 gap-6 mb-8">
                 <div class="stat-card">
@@ -397,6 +407,261 @@
                     </div>
                 </div>
                 <div class="text-xs text-gray-500 mt-3">保存后即时生效；建议先用 auto 逐步放量，再切 remote。</div>
+            </div>
+            <div class="card">
+                <h3 class="text-lg font-bold mb-2">AI生产回切开关</h3>
+                <div class="text-xs text-gray-500 mb-4">用于暂停派发并支持批量释放 dispatch_hold 任务。</div>
+                <div class="flex gap-2 mb-4 items-center">
+                    <button class="btn-primary" data-action="call" data-fn="runPostContentProbePanel" data-args="[]" style="height:30px; padding:0 10px;">运行77/80探针</button>
+                    <button class="btn-primary" data-action="call" data-fn="togglePostContentProbeWatch" data-args="[]" style="height:30px; padding:0 10px;">自动巡检开关</button>
+                    <div class="text-xs text-gray-500">结果在本卡片中部“探针post_id(如77,80)”区域</div>
+                </div>
+                <div class="grid grid-cols-5 gap-4 items-end">
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">暂停派发</div>
+                        <select class="bg-gray-800 border-none w-full" id="ai_prod_hold_enabled">
+                            <option value="0">关闭</option>
+                            <option value="1">开启</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">自动暂停</div>
+                        <select class="bg-gray-800 border-none w-full" id="ai_prod_auto_hold_enabled">
+                            <option value="1">开启</option>
+                            <option value="0">关闭</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">队列阈值</div>
+                        <input id="ai_prod_auto_hold_threshold" class="w-full" placeholder="2000" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">暂停原因</div>
+                        <input id="ai_prod_hold_reason" class="w-full" placeholder="manual_hold" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">关闭Hold自动释放</div>
+                        <select class="bg-gray-800 border-none w-full" id="ai_prod_auto_release_enabled">
+                            <option value="1">开启</option>
+                            <option value="0">关闭</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">自动释放上限</div>
+                        <input id="ai_prod_auto_release_limit" class="w-full" placeholder="500" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">单批释放数量</div>
+                        <input id="ai_prod_auto_release_batch_size" class="w-full" placeholder="200" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">释放间隔秒数</div>
+                        <input id="ai_prod_auto_release_interval_sec" class="w-full" placeholder="15" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">自适应节流</div>
+                        <select class="bg-gray-800 border-none w-full" id="ai_prod_auto_release_adaptive_enabled">
+                            <option value="1">开启</option>
+                            <option value="0">关闭</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">失败率阈值(0-1)</div>
+                        <input id="ai_prod_auto_release_adaptive_fail_ratio" class="w-full" placeholder="0.35" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">节流倍率(%)</div>
+                        <input id="ai_prod_auto_release_adaptive_multiplier_pct" class="w-full" placeholder="50" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">建议应用最小置信度</div>
+                        <input id="ai_prod_adaptive_apply_min_confidence" class="w-full" placeholder="0.40" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">建议灰度融合比例(%)</div>
+                        <input id="ai_prod_adaptive_apply_blend_pct" class="w-full" placeholder="30" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">自动回滚保护</div>
+                        <select class="bg-gray-800 border-none w-full" id="ai_prod_adaptive_rollback_enabled">
+                            <option value="1">开启</option>
+                            <option value="0">关闭</option>
+                        </select>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">回滚失败率增量阈值</div>
+                        <input id="ai_prod_adaptive_rollback_fail_inc" class="w-full" placeholder="0.12" />
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-2">回滚最小样本数</div>
+                        <input id="ai_prod_adaptive_rollback_min_samples" class="w-full" placeholder="6" />
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn-primary" data-action="call" data-fn="saveAIProductionRuntime" data-args="[]" style="height:34px; padding:0 12px;">保存</button>
+                        <button class="btn-primary" data-action="call" data-fn="loadAIProductionRuntime" data-args="[]" style="height:34px; padding:0 12px;">刷新</button>
+                        <button class="btn-primary" data-action="call" data-fn="applyAIProductionAdaptiveSuggestion" data-args="[]" style="height:34px; padding:0 12px;">应用建议</button>
+                        <button class="btn-primary" data-action="call" data-fn="checkAIProductionAdaptiveRollback" data-args="[]" style="height:34px; padding:0 12px;">检查回滚</button>
+                        <button class="btn-primary" data-action="call" data-fn="runAIProductionReleaseTick" data-args="[]" style="height:34px; padding:0 12px;">执行一批</button>
+                        <button class="btn-danger" data-action="call" data-fn="releaseAIProductionHold" data-args="[]" style="height:34px; padding:0 12px;">释放Hold</button>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 mt-3">Hold任务数：<span id="ai_prod_hold_count" class="text-gray-300">-</span>，排队总数：<span id="ai_prod_queued_count" class="text-gray-300">-</span>，上次自动释放：<span id="ai_prod_last_release" class="text-gray-300">-</span>，建议：<span id="ai_prod_suggestion" class="text-gray-300">-</span>，回滚：<span id="ai_prod_rollback" class="text-gray-300">-</span></div>
+                <div class="flex gap-2 mt-2 items-center">
+                    <input id="ai_prod_backfill_limit" class="w-36" placeholder="回填上限(默认500)" />
+                    <button class="btn-primary" data-action="call" data-fn="previewAIBackfillMissingScripts" data-args="[]" style="height:30px; padding:0 10px;">预览回填</button>
+                    <button class="btn-danger" data-action="call" data-fn="executeAIBackfillMissingScripts" data-args="[]" style="height:30px; padding:0 10px;">执行回填</button>
+                </div>
+                <pre id="ai_prod_backfill_out" class="text-xs text-gray-300 mt-2" style="max-height: 120px; overflow:auto; background:#151722; padding:8px; border-radius:6px;">-</pre>
+                <div class="flex gap-2 mt-2 items-center">
+                    <input id="content_integrity_limit" class="w-36" placeholder="巡检上限(默认1000)" />
+                    <button class="btn-primary" data-action="call" data-fn="previewContentIntegrityRepair" data-args="[]" style="height:30px; padding:0 10px;">预览修复</button>
+                    <button class="btn-danger" data-action="call" data-fn="executeContentIntegrityRepair" data-args="[]" style="height:30px; padding:0 10px;">执行修复</button>
+                </div>
+                <pre id="content_integrity_out" class="text-xs text-gray-300 mt-2" style="max-height: 120px; overflow:auto; background:#151722; padding:8px; border-radius:6px;">-</pre>
+                <div class="flex gap-2 mt-2 items-center">
+                    <input id="post_recovery_post_id" class="w-36" placeholder="恢复post_id" />
+                    <button class="btn-primary" data-action="call" data-fn="previewPostRecovery" data-args="[]" style="height:30px; padding:0 10px;">预览恢复</button>
+                    <button class="btn-danger" data-action="call" data-fn="executePostRecovery" data-args="[]" style="height:30px; padding:0 10px;">执行恢复</button>
+                </div>
+                <pre id="post_recovery_out" class="text-xs text-gray-300 mt-2" style="max-height: 120px; overflow:auto; background:#151722; padding:8px; border-radius:6px;">-</pre>
+                <div class="flex gap-2 mt-2 items-center">
+                    <input id="post_probe_ids" class="w-44" placeholder="探针post_id(如77,80)" value="77,80" />
+                    <button class="btn-primary" data-action="call" data-fn="runPostContentProbePanel" data-args="[]" style="height:30px; padding:0 10px;">运行探针</button>
+                    <button class="btn-primary" data-action="call" data-fn="togglePostContentProbeWatch" data-args="[]" style="height:30px; padding:0 10px;">自动巡检开关</button>
+                    <span id="post_probe_badge" class="text-xs text-gray-300" style="padding:3px 8px; border-radius:10px; background:#374151;">UNKNOWN</span>
+                </div>
+                <pre id="post_probe_out" class="text-xs text-gray-300 mt-2" style="max-height: 140px; overflow:auto; background:#151722; padding:8px; border-radius:6px;">-</pre>
+                <div class="flex gap-2 mt-2 items-center">
+                    <select class="bg-gray-800 border-none w-28" id="ai_prod_audit_kind">
+                        <option value="rollback">rollback</option>
+                        <option value="apply">apply</option>
+                        <option value="release">release</option>
+                    </select>
+                    <input id="ai_prod_audit_reason" class="w-44" placeholder="reason 关键字" />
+                    <input id="ai_prod_audit_hours" class="w-36" placeholder="最近小时(如72)" />
+                    <input id="ai_prod_audit_days" class="w-36" placeholder="趋势天数(如7)" />
+                    <button class="btn-primary" data-action="call" data-fn="loadAIProductionAudit" data-args="[]" style="height:30px; padding:0 10px;">筛选</button>
+                    <button class="btn-primary" data-action="call" data-fn="exportAIProductionAuditJson" data-args="[]" style="height:30px; padding:0 10px;">导出JSON</button>
+                    <button class="btn-primary" data-action="call" data-fn="exportAIProductionAuditCsv" data-args="[]" style="height:30px; padding:0 10px;">导出CSV</button>
+                </div>
+                <div id="ai_prod_audit_window" class="text-xs text-gray-500 mt-1">时间窗口：自动</div>
+                <div class="text-xs text-gray-500 mt-2">分组趋势：</div>
+                <pre id="ai_prod_audit_summary" class="text-xs text-gray-300 mt-1" style="max-height: 120px; overflow:auto; background:#151722; padding:8px; border-radius:6px;">-</pre>
+                <div id="ai_prod_reason_topn" class="flex gap-2 mt-2 flex-wrap"></div>
+                <div class="text-xs text-gray-500 mt-2">回滚审计：</div>
+                <pre id="ai_prod_audit" class="text-xs text-gray-300 mt-1" style="max-height: 180px; overflow:auto; background:#151722; padding:8px; border-radius:6px;">-</pre>
+            </div>
+            <div class="card">
+                <h3 class="text-lg font-bold mb-4">搜索共享短链监控</h3>
+                <div class="text-xs text-gray-500 mb-4">指标存储：<span id="ssm_storage" class="text-gray-300">-</span></div>
+                <div class="grid grid-cols-9 gap-4 mb-6">
+                    <div class="stat-card">
+                        <div class="stat-label">创建成功</div>
+                        <div class="stat-val" id="ssm_create_ok">-</div>
+                        <div class="text-gray-500 text-xs">create_ok</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">同码复用</div>
+                        <div class="stat-val" id="ssm_create_reused">-</div>
+                        <div class="text-gray-500 text-xs">create_reused</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">解析成功</div>
+                        <div class="stat-val" id="ssm_resolve_ok">-</div>
+                        <div class="text-gray-500 text-xs">resolve_ok</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">解析未命中</div>
+                        <div class="stat-val" id="ssm_resolve_not_found">-</div>
+                        <div class="text-gray-500 text-xs">resolve_not_found</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">解析过期</div>
+                        <div class="stat-val" id="ssm_resolve_expired">-</div>
+                        <div class="text-gray-500 text-xs">resolve_expired</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">解析命中率</div>
+                        <div class="stat-val" id="ssm_resolve_hit_rate">-</div>
+                        <div class="text-gray-500 text-xs">resolve_hit_rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">解析总量</div>
+                        <div class="stat-val" id="ssm_resolve_total">-</div>
+                        <div class="text-gray-500 text-xs">resolve_total</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">创建客户端错误</div>
+                        <div class="stat-val" id="ssm_create_client_err">-</div>
+                        <div class="text-gray-500 text-xs">create_client_error_total</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">解析服务端错误</div>
+                        <div class="stat-val" id="ssm_resolve_server_err">-</div>
+                        <div class="text-gray-500 text-xs">resolve_server_error_total</div>
+                    </div>
+                </div>
+                <div class="overflow-hidden">
+                    <table class="w-full">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>创建成功</th>
+                                <th>同码复用</th>
+                                <th>解析成功</th>
+                                <th>解析未命中</th>
+                                <th>解析过期</th>
+                                <th>解析命中率</th>
+                                <th>解析总量</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ssm_table"></tbody>
+                    </table>
+                </div>
+                <div class="mt-6 overflow-hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-sm font-bold">最近事件样本</div>
+                        <div class="text-xs text-gray-500"><span id="ssm_samples_meta">用于快速排障（按时间倒序）</span><span id="ssm_samples_events" class="ml-3"></span></div>
+                    </div>
+                    <div class="flex items-center gap-3 mb-3">
+                        <input id="ssm_sample_event_kw" class="w-56" placeholder="事件关键字（如 resolve_）" />
+                        <input id="ssm_sample_key_kw" class="w-44" placeholder="短键关键字" />
+                        <select class="bg-gray-800 border-none" id="ssm_sample_status">
+                            <option value="">全部状态</option>
+                            <option value="200">200</option>
+                            <option value="400">400</option>
+                            <option value="404">404</option>
+                            <option value="503">503</option>
+                        </select>
+                        <select class="bg-gray-800 border-none" id="ssm_sample_limit">
+                            <option value="20">样本20条</option>
+                            <option value="50" selected>样本50条</option>
+                            <option value="100">样本100条</option>
+                        </select>
+                        <select class="bg-gray-800 border-none" id="ssm_sample_window_hours">
+                            <option value="24">近24小时</option>
+                            <option value="72">近72小时</option>
+                            <option value="168" selected>近7天</option>
+                            <option value="720">近30天</option>
+                        </select>
+                        <label class="text-xs text-gray-300 flex items-center gap-2">
+                            <input type="checkbox" id="ssm_sample_only_errors" style="width:14px; height:14px;" />
+                            仅异常
+                        </label>
+                        <button class="btn-danger" data-action="call" data-fn="exportSearchShareSamples" data-args="[]" style="height:34px; padding:0 12px;">导出样本JSON</button>
+                    </div>
+                    <table class="w-full">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>事件</th>
+                                <th>短键</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ssm_samples"></tbody>
+                    </table>
+                </div>
             </div>
             <div class="card">
                 <h3 class="text-lg font-bold mb-4">Worker 回调健康度</h3>
@@ -727,6 +992,7 @@
                     <div class="text-xs text-gray-400">${(u.created_at || '').replace('T',' ').slice(0,16)}</div>
                 </div>
             `).join('') : '<div class="text-gray-500 text-sm">暂无新注册用户</div>';
+            try { await runPostContentProbeDashboard(); } catch (_) {}
         }
 
         async function loadUsers() {
@@ -839,7 +1105,7 @@
                     <td class="text-xs text-gray-300">${j.user_id}</td>
                     <td class="text-xs text-gray-300">${j.post_id || ''}</td>
                     <td class="text-xs text-gray-300">${j.kind || ''}</td>
-                    <td class="text-xs text-gray-400">${j.stage || ''}</td>
+                    <td><span class="badge ${String(j.stage || '') === 'dispatch_hold' ? 'badge-red' : 'badge-blue'}">${j.stage || ''}</span></td>
                     <td>
                         <div class="w-24 bg-gray-700 h-1.5 rounded-full overflow-hidden">
                             <div class="bg-blue-500 h-full" style="width:${Math.max(0, Math.min(100, Number(j.progress||0)))}%"></div>
@@ -850,6 +1116,9 @@
                     <td class="text-xs text-gray-300">
                         ${String(j.status||'') === 'processing'
                             ? `<button class="text-red-400 text-xs hover:underline" data-action="call" data-fn="adminCancelAIJob" data-args='[${JSON.stringify(String(j.id || ""))}]' data-stop="1">取消</button>`
+                            : ''}
+                        ${String(j.stage||'') === 'dispatch_hold'
+                            ? `<button class="text-amber-400 text-xs hover:underline ml-2" data-action="call" data-fn="adminReleaseAIJobHold" data-args='[${JSON.stringify(String(j.id || ""))}]' data-stop="1">释放Hold</button>`
                             : ''}
                     </td>
                 </tr>
@@ -889,6 +1158,26 @@
                 return alert(msg);
             }
             await loadAITasks();
+        }
+
+        async function adminReleaseAIJobHold(jobId) {
+            const jid = String(jobId || '').trim();
+            if (!jid) return;
+            if (!confirm(`确认释放任务 ${jid} 的 dispatch_hold 吗？`)) return;
+            const res = await fetchAuth(`${API_BASE}/ai/admin/jobs/${encodeURIComponent(jid)}/release-hold`, { method: 'POST' });
+            if (!res || !res.ok) {
+                let msg = '释放失败';
+                try {
+                    const j = await res.json();
+                    if (j && (j.detail || j.message)) msg = String(j.detail || j.message);
+                } catch (_) {
+                }
+                return alert(msg);
+            }
+            const data = await res.json().catch(() => ({}));
+            await loadAITasks();
+            try { await loadAIProductionRuntime(); } catch (_) {}
+            if (data && data.hold_enabled) alert('任务已释放到等待派发，但全局暂停仍开启，请先关闭“暂停派发”开关');
         }
 
         async function loadAudit() {
@@ -992,6 +1281,36 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = `worker_callback_samples_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            try { a.remove(); } catch (_) {}
+            try { URL.revokeObjectURL(url); } catch (_) {}
+        }
+
+        async function exportSearchShareSamples() {
+            const d = Number(document.getElementById('cb_metrics_days')?.value || 7) || 7;
+            const skw = String(document.getElementById('ssm_sample_event_kw')?.value || '').trim();
+            const kkw = String(document.getElementById('ssm_sample_key_kw')?.value || '').trim();
+            const sst = String(document.getElementById('ssm_sample_status')?.value || '').trim();
+            const slm = Math.max(1, Math.min(100, Number(document.getElementById('ssm_sample_limit')?.value || 50) || 50));
+            const swh = Math.max(1, Math.min(24 * 30, Number(document.getElementById('ssm_sample_window_hours')?.value || 168) || 168));
+            const serr = !!document.getElementById('ssm_sample_only_errors')?.checked;
+            const q = [];
+            q.push(`days=${encodeURIComponent(String(Math.max(1, Math.min(30, d))))}`);
+            q.push(`sample_limit=${encodeURIComponent(String(slm))}`);
+            q.push(`sample_window_hours=${encodeURIComponent(String(swh))}`);
+            if (skw) q.push(`sample_event_kw=${encodeURIComponent(skw)}`);
+            if (kkw) q.push(`sample_key_kw=${encodeURIComponent(kkw)}`);
+            if (sst) q.push(`sample_status=${encodeURIComponent(sst)}`);
+            if (serr) q.push(`sample_only_errors=1`);
+            const res = await fetchAuth(`${API_BASE}/ops/admin/search-share/metrics?${q.join('&')}`);
+            if (!res || !res.ok) return alert('导出失败');
+            const data = await res.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `search_share_samples_${new Date().toISOString().slice(0,10)}.json`;
             document.body.appendChild(a);
             a.click();
             try { a.remove(); } catch (_) {}
@@ -1149,11 +1468,1124 @@
             alert('已保存');
         }
 
+        async function loadAIProductionRuntime() {
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/status`);
+            if (!res || !res.ok) return;
+            const payload = await res.json().catch(() => ({}));
+            const data = payload && typeof payload === 'object' && payload.runtime && typeof payload.runtime === 'object' ? payload.runtime : {};
+            const hold = !!(data.dispatch_hold_enabled);
+            const reason = String(data.dispatch_hold_reason || 'manual_hold');
+            const autoHold = !!(data.auto_hold_enabled);
+            const thr = Math.max(10, Number(data.auto_hold_queue_threshold || 2000) || 2000);
+            const autoRelease = !!(data.auto_release_on_disable);
+            const autoReleaseLimit = Math.max(1, Number(data.auto_release_limit || 500) || 500);
+            const autoReleaseBatch = Math.max(1, Number(data.auto_release_batch_size || 200) || 200);
+            const autoReleaseInterval = Math.max(1, Number(data.auto_release_interval_sec || 15) || 15);
+            const autoReleaseAdaptiveEnabled = !!(data.auto_release_adaptive_enabled);
+            const autoReleaseAdaptiveFailRatio = Math.max(0, Math.min(1, Number(data.auto_release_adaptive_fail_ratio || 0.35) || 0.35));
+            const autoReleaseAdaptiveMulPct = Math.max(5, Math.min(100, Number(data.auto_release_adaptive_multiplier_pct || 50) || 50));
+            const adaptiveApplyMinConfidence = Math.max(0, Math.min(1, Number(data.auto_release_adaptive_apply_min_confidence || 0.4) || 0.4));
+            const adaptiveApplyBlendPct = Math.max(5, Math.min(100, Number(data.auto_release_adaptive_apply_blend_pct || 30) || 30));
+            const adaptiveRollbackEnabled = !!(data.auto_release_rollback_enabled);
+            const adaptiveRollbackFailInc = Math.max(0, Math.min(1, Number(data.auto_release_rollback_fail_ratio_increase || 0.12) || 0.12));
+            const adaptiveRollbackMinSamples = Math.max(1, Number(data.auto_release_rollback_min_samples || 6) || 6);
+            const lastReleaseTs = Math.max(0, Number(data.last_auto_release_ts || 0) || 0);
+            const lastReleaseCnt = Math.max(0, Number(data.last_auto_release_count || 0) || 0);
+            const lastEffectiveBatch = Math.max(0, Number(data.last_auto_release_effective_batch || 0) || 0);
+            const lastAdaptiveMode = String(data.last_auto_release_adaptive_mode || 'normal');
+            const lastFailRatio = Math.max(0, Math.min(1, Number(data.last_auto_release_fail_ratio || 0) || 0));
+            const holdCnt = Math.max(0, Number(payload && payload.hold_count || 0) || 0);
+            const qCnt = Math.max(0, Number(payload && payload.queued_total || 0) || 0);
+            const nextSec = Math.max(0, Number(payload && payload.next_auto_release_in_sec || 0) || 0);
+            const adaptiveMode = String(payload && payload.adaptive_mode || 'normal');
+            const adaptiveFailRatio = Math.max(0, Math.min(1, Number(payload && payload.adaptive_fail_ratio || 0) || 0));
+            const suggestion = payload && typeof payload === 'object' && payload.adaptive_suggestion && typeof payload.adaptive_suggestion === 'object' ? payload.adaptive_suggestion : {};
+            const suggestionApply = payload && typeof payload === 'object' && payload.adaptive_suggestion_apply && typeof payload.adaptive_suggestion_apply === 'object' ? payload.adaptive_suggestion_apply : {};
+            const rollback = payload && typeof payload === 'object' && payload.adaptive_rollback && typeof payload.adaptive_rollback === 'object' ? payload.adaptive_rollback : {};
+            try {
+                const el = document.getElementById('ai_prod_hold_enabled');
+                if (el) el.value = hold ? '1' : '0';
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_hold_enabled');
+                if (el) el.value = autoHold ? '1' : '0';
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_hold_threshold');
+                if (el) el.value = String(thr);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_hold_reason');
+                if (el) el.value = reason;
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_release_enabled');
+                if (el) el.value = autoRelease ? '1' : '0';
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_release_limit');
+                if (el) el.value = String(autoReleaseLimit);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_release_batch_size');
+                if (el) el.value = String(autoReleaseBatch);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_release_interval_sec');
+                if (el) el.value = String(autoReleaseInterval);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_release_adaptive_enabled');
+                if (el) el.value = autoReleaseAdaptiveEnabled ? '1' : '0';
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_release_adaptive_fail_ratio');
+                if (el) el.value = String(autoReleaseAdaptiveFailRatio);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_auto_release_adaptive_multiplier_pct');
+                if (el) el.value = String(autoReleaseAdaptiveMulPct);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_adaptive_apply_min_confidence');
+                if (el) el.value = String(adaptiveApplyMinConfidence);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_adaptive_apply_blend_pct');
+                if (el) el.value = String(adaptiveApplyBlendPct);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_adaptive_rollback_enabled');
+                if (el) el.value = adaptiveRollbackEnabled ? '1' : '0';
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_adaptive_rollback_fail_inc');
+                if (el) el.value = String(adaptiveRollbackFailInc);
+            } catch (_) {}
+            try {
+                const el = document.getElementById('ai_prod_adaptive_rollback_min_samples');
+                if (el) el.value = String(adaptiveRollbackMinSamples);
+            } catch (_) {}
+            try {
+                const hEl = document.getElementById('ai_prod_hold_count');
+                if (hEl) hEl.innerText = String(holdCnt);
+                const qEl = document.getElementById('ai_prod_queued_count');
+                if (qEl) qEl.innerText = String(qCnt);
+                const lEl = document.getElementById('ai_prod_last_release');
+                if (lEl) lEl.innerText = `${lastReleaseTs > 0 ? `${new Date(lastReleaseTs * 1000).toLocaleString()} / ${lastReleaseCnt}` : '-'} / batch:${lastEffectiveBatch} / mode:${lastAdaptiveMode} / fr:${Math.round(lastFailRatio * 100)}% / now:${adaptiveMode}(${Math.round(adaptiveFailRatio * 100)}%) / next:${nextSec}s`;
+                const sEl = document.getElementById('ai_prod_suggestion');
+                if (sEl) sEl.innerText = `fr=${Number(suggestion.fail_ratio || 0.35).toFixed(3)} / mul=${Math.round(Number(suggestion.multiplier_pct || 50))}% / conf=${Math.round((Number(suggestion.confidence || 0) || 0) * 100)}% / n=${Math.round(Number(suggestion.samples || 0) || 0)} / apply=${suggestionApply && suggestionApply.can_apply ? 'ready' : 'blocked'}(${String(suggestionApply.reason || 'unknown')})`;
+                const rEl = document.getElementById('ai_prod_rollback');
+                if (rEl) rEl.innerText = `${String(rollback.action || 'unknown')} / samples=${Math.round(Number(rollback.samples || 0) || 0)} / thr=${Number(rollback.threshold || 0).toFixed(3)} / avg=${Number(rollback.avg_fail_ratio || 0).toFixed(3)}`;
+            } catch (_) {}
+            try { await loadAIProductionAudit(); } catch (_) {}
+        }
+
+        async function loadAIProductionAudit() {
+            const el = document.getElementById('ai_prod_audit');
+            if (!el) return;
+            if (!window.__aiProdAuditWindow) window.__aiProdAuditWindow = { sinceTs: 0, untilTs: 0, day: '' };
+            const kind = String(document.getElementById('ai_prod_audit_kind')?.value || 'rollback').trim() || 'rollback';
+            const reason = String(document.getElementById('ai_prod_audit_reason')?.value || '').trim();
+            const hours = Number(document.getElementById('ai_prod_audit_hours')?.value || 0) || 0;
+            const q = [];
+            q.push('limit=12');
+            q.push(`kind=${encodeURIComponent(kind)}`);
+            if (reason) q.push(`reason=${encodeURIComponent(reason)}`);
+            if ((Number(window.__aiProdAuditWindow.sinceTs || 0) > 0) && (Number(window.__aiProdAuditWindow.untilTs || 0) > 0)) {
+                q.push(`since_ts=${encodeURIComponent(String(Math.floor(Number(window.__aiProdAuditWindow.sinceTs || 0))))}`);
+                q.push(`until_ts=${encodeURIComponent(String(Math.floor(Number(window.__aiProdAuditWindow.untilTs || 0))))}`);
+            } else if (hours > 0) {
+                q.push(`since_ts=${encodeURIComponent(String(Math.max(0, Math.floor(Date.now() / 1000) - Math.floor(hours * 3600))))}`);
+            }
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/audit?${q.join('&')}`);
+            if (!res || !res.ok) {
+                el.innerText = '-';
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            const arr1 = Array.isArray(data && data.auto_release_history) ? data.auto_release_history : [];
+            const arr2 = Array.isArray(data && data.adaptive_apply_history) ? data.adaptive_apply_history : [];
+            const arr3 = Array.isArray(data && data.adaptive_rollback_history) ? data.adaptive_rollback_history : [];
+            const lines = [];
+            lines.push('auto_release_history:');
+            if (!arr1.length) lines.push('-');
+            arr1.slice(0, 6).forEach((x) => {
+                const ts = Number(x && x.ts || 0) || 0;
+                lines.push(`- ${ts > 0 ? new Date(ts * 1000).toLocaleString() : '-'} rel=${Math.round(Number(x && x.released || 0) || 0)} batch=${Math.round(Number(x && x.effective_batch || 0) || 0)} fr=${Number(x && x.fail_ratio || 0).toFixed(3)} mode=${String(x && x.mode || '')}`);
+            });
+            lines.push('adaptive_apply_history:');
+            if (!arr2.length) lines.push('-');
+            arr2.slice(0, 6).forEach((x) => {
+                const ts = Number(x && x.ts || 0) || 0;
+                lines.push(`- ${ts > 0 ? new Date(ts * 1000).toLocaleString() : '-'} fr=${Number(x && x.applied_fail_ratio || 0).toFixed(3)} mul=${Math.round(Number(x && x.applied_multiplier_pct || 0) || 0)} blend=${Math.round(Number(x && x.blend_pct || 0) || 0)} force=${x && x.force ? '1' : '0'}`);
+            });
+            lines.push('adaptive_rollback_history:');
+            if (!arr3.length) lines.push('-');
+            arr3.slice(0, 6).forEach((x) => {
+                const ts = Number(x && x.ts || 0) || 0;
+                lines.push(`- ${ts > 0 ? new Date(ts * 1000).toLocaleString() : '-'} reason=${String(x && x.reason || '')} avg=${Number(x && x.avg_fail_ratio || 0).toFixed(3)} thr=${Number(x && x.threshold || 0).toFixed(3)} restore(fr=${Number(x && x.restored_fail_ratio || 0).toFixed(3)},mul=${Math.round(Number(x && x.restored_multiplier_pct || 0) || 0)})`);
+            });
+            el.innerText = lines.join('\n');
+            try { await loadAIProductionAuditSummary(); } catch (_) {}
+        }
+
+        async function loadAIProductionAuditSummary() {
+            const el = document.getElementById('ai_prod_audit_summary');
+            if (!el) return;
+            const topnEl = document.getElementById('ai_prod_reason_topn');
+            const kind = String(document.getElementById('ai_prod_audit_kind')?.value || 'rollback').trim() || 'rollback';
+            const reason = String(document.getElementById('ai_prod_audit_reason')?.value || '').trim();
+            const days = Number(document.getElementById('ai_prod_audit_days')?.value || 7) || 7;
+            const q = [];
+            q.push(`kind=${encodeURIComponent(kind)}`);
+            q.push(`days=${encodeURIComponent(String(Math.max(1, Math.min(90, Math.floor(days)))) )}`);
+            if (reason) q.push(`reason=${encodeURIComponent(reason)}`);
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/audit/summary?${q.join('&')}`);
+            if (!res || !res.ok) {
+                el.innerText = '-';
+                return;
+            }
+            const data = await res.json().catch(() => ({}));
+            const reasons = Array.isArray(data && data.reasons) ? data.reasons : [];
+            const trends = Array.isArray(data && data.trends) ? data.trends : [];
+            const total = Math.max(0, Number(data && data.count || 0) || 0);
+            const color = kind === 'rollback' ? '#fca5a5' : (kind === 'apply' ? '#93c5fd' : '#86efac');
+            try {
+                el.style.color = color;
+                el.style.borderLeft = `3px solid ${color}`;
+                el.style.paddingLeft = '8px';
+            } catch (_) {}
+            const sparkChars = ['▁','▂','▃','▄','▅','▆','▇','█'];
+            const trendCounts = trends.map((x) => Math.max(0, Number(x && x.count || 0) || 0));
+            const maxTrend = trendCounts.length ? Math.max(...trendCounts) : 0;
+            const spark = trendCounts.map((v) => {
+                if (maxTrend <= 0) return sparkChars[0];
+                const idx = Math.max(0, Math.min(7, Math.round((v / maxTrend) * 7)));
+                return sparkChars[idx];
+            }).join('');
+            const lines = [];
+            lines.push(`kind=${String(data && data.kind || kind)} count=${Math.round(Number(data && data.count || 0) || 0)} days=${Math.round(Number(data && data.days || 0) || 0)}`);
+            lines.push(`sparkline: ${spark || '-'}`);
+            lines.push('reasons:');
+            if (!reasons.length) lines.push('-');
+            reasons.slice(0, 8).forEach((x, idx) => {
+                const tag = idx === 0 ? '★' : (idx === 1 ? '☆' : '-');
+                const c = Math.max(0, Number(x && x.count || 0) || 0);
+                const pct = total > 0 ? ((c / total) * 100) : 0;
+                lines.push(`${tag} ${String(x && x.reason || 'unknown')}: ${Math.round(c)} (${pct.toFixed(1)}%)`);
+            });
+            lines.push('trends:');
+            if (!trends.length) lines.push('-');
+            trends.slice(-14).forEach((x) => lines.push(`- ${String(x && x.day || '')}: ${Math.round(Number(x && x.count || 0) || 0)}`));
+            el.innerText = lines.join('\n');
+            if (topnEl) {
+                const html = reasons.slice(0, 8).map((x, idx) => {
+                    const rs = String(x && x.reason || 'unknown');
+                    const arg = rs.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const c = Math.max(0, Number(x && x.count || 0) || 0);
+                    const pct = total > 0 ? ((c / total) * 100) : 0;
+                    const color = idx === 0 ? '#fbbf24' : (idx === 1 ? '#93c5fd' : '#9ca3af');
+                    return `<button style="height:24px;padding:0 8px;border-radius:12px;border:1px solid ${color};color:${color};background:transparent;font-size:11px;" data-action="call" data-fn="applyAIProductionAuditReasonFilter" data-args='["${arg}"]'>${rs} ${pct.toFixed(1)}%</button>`;
+                }).join('');
+                topnEl.innerHTML = `${html}<button style="height:24px;padding:0 8px;border-radius:12px;border:1px solid #6b7280;color:#d1d5db;background:transparent;font-size:11px;" data-action="call" data-fn="applyAIProductionAuditReasonFilter" data-args='[""]'>清空</button>`;
+            }
+            const trendWrap = document.getElementById('ai_prod_reason_topn');
+            if (trendWrap) {
+                const trendBtns = trends.slice(-8).map((x) => {
+                    const d = String(x && x.day || '');
+                    const c = Math.round(Number(x && x.count || 0) || 0);
+                    const arg = d.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    return `<button style="height:24px;padding:0 8px;border-radius:12px;border:1px solid #4b5563;color:#d1d5db;background:transparent;font-size:11px;" data-action="call" data-fn="applyAIProductionAuditDayFilter" data-args='["${arg}"]'>${d} ${c}</button>`;
+                }).join('');
+                trendWrap.innerHTML = `${trendWrap.innerHTML}${trendBtns}<button style="height:24px;padding:0 8px;border-radius:12px;border:1px solid #6b7280;color:#d1d5db;background:transparent;font-size:11px;" data-action="call" data-fn="applyAIProductionAuditDayFilter" data-args='[""]'>清空日期</button>`;
+            }
+            const trendEl = document.getElementById('ai_prod_audit_window');
+            if (trendEl) {
+                const d = String(window.__aiProdAuditWindow.day || '');
+                trendEl.innerText = d ? `时间窗口：${d} (UTC)` : '时间窗口：自动';
+            }
+        }
+
+        async function applyAIProductionAuditReasonFilter(reason) {
+            const el = document.getElementById('ai_prod_audit_reason');
+            if (el) el.value = String(reason || '');
+            await loadAIProductionAudit();
+        }
+
+        async function applyAIProductionAuditDayFilter(day) {
+            if (!window.__aiProdAuditWindow) window.__aiProdAuditWindow = { sinceTs: 0, untilTs: 0, day: '' };
+            const d = String(day || '').trim();
+            if (!d) {
+                window.__aiProdAuditWindow = { sinceTs: 0, untilTs: 0, day: '' };
+                await loadAIProductionAudit();
+                return;
+            }
+            const dt = new Date(`${d}T00:00:00Z`);
+            const start = Math.floor(dt.getTime() / 1000);
+            const end = start + 24 * 3600 - 1;
+            window.__aiProdAuditWindow = { sinceTs: start, untilTs: end, day: d };
+            await loadAIProductionAudit();
+        }
+
+        async function exportAIProductionAuditJson() {
+            if (!window.__aiProdAuditWindow) window.__aiProdAuditWindow = { sinceTs: 0, untilTs: 0, day: '' };
+            const kind = String(document.getElementById('ai_prod_audit_kind')?.value || 'rollback').trim() || 'rollback';
+            const reason = String(document.getElementById('ai_prod_audit_reason')?.value || '').trim();
+            const hours = Number(document.getElementById('ai_prod_audit_hours')?.value || 0) || 0;
+            const q = [];
+            q.push(`kind=${encodeURIComponent(kind)}`);
+            q.push('format=json');
+            q.push('limit=500');
+            if (reason) q.push(`reason=${encodeURIComponent(reason)}`);
+            if ((Number(window.__aiProdAuditWindow.sinceTs || 0) > 0) && (Number(window.__aiProdAuditWindow.untilTs || 0) > 0)) {
+                q.push(`since_ts=${encodeURIComponent(String(Math.floor(Number(window.__aiProdAuditWindow.sinceTs || 0))))}`);
+                q.push(`until_ts=${encodeURIComponent(String(Math.floor(Number(window.__aiProdAuditWindow.untilTs || 0))))}`);
+            } else if (hours > 0) {
+                q.push(`since_ts=${encodeURIComponent(String(Math.max(0, Math.floor(Date.now() / 1000) - Math.floor(hours * 3600))))}`);
+            }
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/audit/export?${q.join('&')}`);
+            if (!res || !res.ok) return alert('导出失败');
+            const data = await res.json().catch(() => ({}));
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai_production_audit_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            try { a.remove(); } catch (_) {}
+            try { URL.revokeObjectURL(url); } catch (_) {}
+        }
+
+        async function exportAIProductionAuditCsv() {
+            if (!window.__aiProdAuditWindow) window.__aiProdAuditWindow = { sinceTs: 0, untilTs: 0, day: '' };
+            const kind = String(document.getElementById('ai_prod_audit_kind')?.value || 'rollback').trim() || 'rollback';
+            const reason = String(document.getElementById('ai_prod_audit_reason')?.value || '').trim();
+            const hours = Number(document.getElementById('ai_prod_audit_hours')?.value || 0) || 0;
+            const q = [];
+            q.push(`kind=${encodeURIComponent(kind)}`);
+            q.push('format=csv');
+            q.push('limit=500');
+            if (reason) q.push(`reason=${encodeURIComponent(reason)}`);
+            if ((Number(window.__aiProdAuditWindow.sinceTs || 0) > 0) && (Number(window.__aiProdAuditWindow.untilTs || 0) > 0)) {
+                q.push(`since_ts=${encodeURIComponent(String(Math.floor(Number(window.__aiProdAuditWindow.sinceTs || 0))))}`);
+                q.push(`until_ts=${encodeURIComponent(String(Math.floor(Number(window.__aiProdAuditWindow.untilTs || 0))))}`);
+            } else if (hours > 0) {
+                q.push(`since_ts=${encodeURIComponent(String(Math.max(0, Math.floor(Date.now() / 1000) - Math.floor(hours * 3600))))}`);
+            }
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/audit/export?${q.join('&')}`);
+            if (!res || !res.ok) return alert('导出失败');
+            const txt = await res.text().catch(() => '');
+            const blob = new Blob([txt], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ai_production_audit_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            try { a.remove(); } catch (_) {}
+            try { URL.revokeObjectURL(url); } catch (_) {}
+        }
+
+        async function saveAIProductionRuntime() {
+            const dispatchHoldEnabled = String(document.getElementById('ai_prod_hold_enabled')?.value || '0') === '1';
+            const autoHoldEnabled = String(document.getElementById('ai_prod_auto_hold_enabled')?.value || '1') === '1';
+            const autoHoldQueueThreshold = Number(document.getElementById('ai_prod_auto_hold_threshold')?.value || 2000) || 2000;
+            const dispatchHoldReason = String(document.getElementById('ai_prod_hold_reason')?.value || 'manual_hold').trim() || 'manual_hold';
+            const autoReleaseOnDisable = String(document.getElementById('ai_prod_auto_release_enabled')?.value || '1') === '1';
+            const autoReleaseLimit = Number(document.getElementById('ai_prod_auto_release_limit')?.value || 500) || 500;
+            const autoReleaseBatchSize = Number(document.getElementById('ai_prod_auto_release_batch_size')?.value || 200) || 200;
+            const autoReleaseIntervalSec = Number(document.getElementById('ai_prod_auto_release_interval_sec')?.value || 15) || 15;
+            const autoReleaseAdaptiveEnabled = String(document.getElementById('ai_prod_auto_release_adaptive_enabled')?.value || '1') === '1';
+            const autoReleaseAdaptiveFailRatio = Number(document.getElementById('ai_prod_auto_release_adaptive_fail_ratio')?.value || 0.35);
+            const autoReleaseAdaptiveMultiplierPct = Number(document.getElementById('ai_prod_auto_release_adaptive_multiplier_pct')?.value || 50) || 50;
+            const adaptiveApplyMinConfidence = Number(document.getElementById('ai_prod_adaptive_apply_min_confidence')?.value || 0.4);
+            const adaptiveApplyBlendPct = Number(document.getElementById('ai_prod_adaptive_apply_blend_pct')?.value || 30) || 30;
+            const adaptiveRollbackEnabled = String(document.getElementById('ai_prod_adaptive_rollback_enabled')?.value || '1') === '1';
+            const adaptiveRollbackFailInc = Number(document.getElementById('ai_prod_adaptive_rollback_fail_inc')?.value || 0.12);
+            const adaptiveRollbackMinSamples = Number(document.getElementById('ai_prod_adaptive_rollback_min_samples')?.value || 6) || 6;
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/runtime`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dispatch_hold_enabled: dispatchHoldEnabled, auto_hold_enabled: autoHoldEnabled, auto_hold_queue_threshold: autoHoldQueueThreshold, dispatch_hold_reason: dispatchHoldReason, auto_release_on_disable: autoReleaseOnDisable, auto_release_limit: autoReleaseLimit, auto_release_batch_size: autoReleaseBatchSize, auto_release_interval_sec: autoReleaseIntervalSec, auto_release_adaptive_enabled: autoReleaseAdaptiveEnabled, auto_release_adaptive_fail_ratio: autoReleaseAdaptiveFailRatio, auto_release_adaptive_multiplier_pct: autoReleaseAdaptiveMultiplierPct, auto_release_adaptive_apply_min_confidence: adaptiveApplyMinConfidence, auto_release_adaptive_apply_blend_pct: adaptiveApplyBlendPct, auto_release_rollback_enabled: adaptiveRollbackEnabled, auto_release_rollback_fail_ratio_increase: adaptiveRollbackFailInc, auto_release_rollback_min_samples: adaptiveRollbackMinSamples })
+            });
+            if (!res || !res.ok) return alert('保存失败');
+            await loadAIProductionRuntime();
+            alert('已保存AI生产回切配置');
+        }
+
+        async function releaseAIProductionHold() {
+            const maxRelease = Number(prompt('本次最多释放多少个 dispatch_hold 任务？', '500') || 500) || 500;
+            if (maxRelease <= 0) return;
+            const disableHold = confirm('释放后是否同时关闭“暂停派发”开关？建议选择“确定”。');
+            const reason = String(document.getElementById('ai_prod_hold_reason')?.value || 'manual_release').trim() || 'manual_release';
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/release-hold`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ limit: maxRelease, disable_hold: disableHold, reason })
+            });
+            if (!res || !res.ok) return alert('释放失败');
+            const data = await res.json().catch(() => ({}));
+            await loadAIProductionRuntime();
+            await loadAITasks();
+            alert(`已释放 ${Number(data && data.released || 0) || 0} 个任务`);
+        }
+
+        async function runAIProductionReleaseTick() {
+            const force = confirm('是否强制执行一批释放（忽略间隔和全局hold开关）？');
+            const reason = String(document.getElementById('ai_prod_hold_reason')?.value || 'manual_tick').trim() || 'manual_tick';
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/release-tick`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ force, reason })
+            });
+            if (!res || !res.ok) return alert('执行失败');
+            const data = await res.json().catch(() => ({}));
+            await loadAIProductionRuntime();
+            await loadAITasks();
+            const act = String(data && data.action || 'unknown');
+            const rel = Number(data && data.released || 0) || 0;
+            if (act === 'throttled') return alert(`节流中，稍后再试（wait=${Number(data && data.wait_sec || 0) || 0}s）`);
+            if (act === 'hold_enabled') return alert('当前全局暂停仍开启，可选择强制执行');
+            alert(`执行完成：action=${act}，released=${rel}`);
+        }
+
+        async function applyAIProductionAdaptiveSuggestion() {
+            const ok = confirm('应用当前自适应参数建议？低置信度时会被保护阈拦截。');
+            if (!ok) return;
+            const force = confirm('是否强制应用（忽略最小置信度保护阈）？');
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/adaptive-suggestion/apply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ use_suggestion: true, force })
+            });
+            if (!res || !res.ok) return alert('应用失败');
+            const data = await res.json().catch(() => ({}));
+            await loadAIProductionRuntime();
+            const act = String(data && data.action || 'unknown');
+            if (act === 'insufficient_confidence') {
+                return alert(`未应用：当前置信度${Math.round((Number(data && data.confidence || 0) || 0) * 100)}%低于阈值${Math.round((Number(data && data.min_confidence || 0) || 0) * 100)}%`);
+            }
+            const ap = data && data.applied && typeof data.applied === 'object' ? data.applied : {};
+            const meta = data && data.apply_meta && typeof data.apply_meta === 'object' ? data.apply_meta : {};
+            alert(`已应用建议：fail_ratio=${Number(ap.fail_ratio || 0.35).toFixed(3)}，multiplier=${Math.round(Number(ap.multiplier_pct || 50))}% / blend=${Math.round(Number(meta.blend_pct || 0) || 0)}%`);
+        }
+
+        async function checkAIProductionAdaptiveRollback() {
+            const force = confirm('是否强制执行回滚检查（忽略样本不足）？');
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/adaptive-rollback/check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ force })
+            });
+            if (!res || !res.ok) return alert('回滚检查失败');
+            const data = await res.json().catch(() => ({}));
+            await loadAIProductionRuntime();
+            const act = data && data.action && typeof data.action === 'object' ? data.action : {};
+            alert(`回滚检查结果：${String(act.action || 'unknown')} / samples=${Math.round(Number(act.samples || 0) || 0)}`);
+        }
+
+        async function previewAIBackfillMissingScripts() {
+            const lim = Math.max(1, Math.min(5000, Number(document.getElementById('ai_prod_backfill_limit')?.value || 500) || 500));
+            const outEl = document.getElementById('ai_prod_backfill_out');
+            if (outEl) outEl.innerText = '回填预览中...';
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/backfill-missing-scripts/preview?limit=${encodeURIComponent(String(lim))}`);
+            if (!res || !res.ok) {
+                if (outEl) outEl.innerText = '回填预览失败';
+                return alert('回填预览失败');
+            }
+            const data = await res.json().catch(() => ({}));
+            const r = data && typeof data === 'object' && data.result && typeof data.result === 'object' ? data.result : {};
+            if (outEl) outEl.innerText = `${formatBackfillSummary(r)}\n\n${JSON.stringify(r, null, 2)}`;
+            alert(`预览完成：scanned=${Number(r.scanned || 0) || 0}，updated=${Number(r.updated_jobs || 0) || 0}`);
+        }
+
+        function formatBackfillSummary(r) {
+            const scanned = Number(r && r.scanned || 0) || 0;
+            const updated = Number(r && r.updated_jobs || 0) || 0;
+            const fixedRes = Number(r && r.fixed_result_script || 0) || 0;
+            const fixedDraft = Number(r && r.fixed_draft_script || 0) || 0;
+            const failed = Number(r && r.failed_unresolved || 0) || 0;
+            return `summary: scanned=${scanned}, updated=${updated}, fixed_result=${fixedRes}, fixed_draft=${fixedDraft}, failed=${failed}`;
+        }
+
+        async function executeAIBackfillMissingScripts() {
+            const lim = Math.max(1, Math.min(5000, Number(document.getElementById('ai_prod_backfill_limit')?.value || 500) || 500));
+            const outEl = document.getElementById('ai_prod_backfill_out');
+            if (outEl) outEl.innerText = '执行前预览中...';
+            const prevRes = await fetchAuth(`${API_BASE}/ops/ai-production/backfill-missing-scripts/preview?limit=${encodeURIComponent(String(lim))}`);
+            if (!prevRes || !prevRes.ok) {
+                if (outEl) outEl.innerText = '执行前预览失败';
+                return alert('执行前预览失败');
+            }
+            const prevData = await prevRes.json().catch(() => ({}));
+            const prev = prevData && typeof prevData === 'object' && prevData.result && typeof prevData.result === 'object' ? prevData.result : {};
+            if (outEl) outEl.innerText = `${formatBackfillSummary(prev)}\n\n${JSON.stringify(prev, null, 2)}`;
+            const ok = confirm(`确认执行历史回填？\nlimit=${lim}\n${formatBackfillSummary(prev)}\n将写入数据库。`);
+            if (!ok) return;
+            if (outEl) outEl.innerText = '回填执行中...';
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/backfill-missing-scripts/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ limit: lim, confirm_phrase: 'BACKFILL_AI_MISSING_SCRIPTS' })
+            });
+            if (!res || !res.ok) {
+                if (outEl) outEl.innerText = '回填执行失败';
+                return alert('回填执行失败');
+            }
+            const data = await res.json().catch(() => ({}));
+            const r = data && typeof data === 'object' && data.result && typeof data.result === 'object' ? data.result : {};
+            if (outEl) outEl.innerText = `${formatBackfillSummary(r)}\n\n${JSON.stringify(r, null, 2)}`;
+            await loadAIProductionRuntime();
+            await loadAITasks();
+            alert(`回填完成：updated=${Number(r.updated_jobs || 0) || 0}`);
+        }
+
+        function formatContentIntegritySummary(r) {
+            const scanned = Number(r && r.scanned || 0) || 0;
+            const bad = Number(r && r.bad_candidates || 0) || 0;
+            const fixed = Number(r && r.fixed_posts || 0) || 0;
+            const linked = Number(r && r.linked_job || 0) || 0;
+            const fs = Number(r && r.fixed_script || 0) || 0;
+            const unresolved = Number(r && r.unresolved || 0) || 0;
+            return `summary: scanned=${scanned}, bad=${bad}, fixed=${fixed}, linked_job=${linked}, fixed_script=${fs}, unresolved=${unresolved}`;
+        }
+
+        async function previewContentIntegrityRepair() {
+            const lim = Math.max(1, Math.min(5000, Number(document.getElementById('content_integrity_limit')?.value || 1000) || 1000));
+            const outEl = document.getElementById('content_integrity_out');
+            if (outEl) outEl.innerText = '完整性预览中...';
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/content-integrity-repair/preview?limit=${encodeURIComponent(String(lim))}`);
+            if (!res || !res.ok) {
+                if (outEl) outEl.innerText = '完整性预览失败';
+                return alert('完整性预览失败');
+            }
+            const data = await res.json().catch(() => ({}));
+            const r = data && typeof data === 'object' && data.result && typeof data.result === 'object' ? data.result : {};
+            if (outEl) outEl.innerText = `${formatContentIntegritySummary(r)}\n\n${JSON.stringify(r, null, 2)}`;
+            alert(`预览完成：${formatContentIntegritySummary(r)}`);
+        }
+
+        async function executeContentIntegrityRepair() {
+            const lim = Math.max(1, Math.min(5000, Number(document.getElementById('content_integrity_limit')?.value || 1000) || 1000));
+            const outEl = document.getElementById('content_integrity_out');
+            if (outEl) outEl.innerText = '执行前预览中...';
+            const prevRes = await fetchAuth(`${API_BASE}/ops/ai-production/content-integrity-repair/preview?limit=${encodeURIComponent(String(lim))}`);
+            if (!prevRes || !prevRes.ok) {
+                if (outEl) outEl.innerText = '执行前预览失败';
+                return alert('执行前预览失败');
+            }
+            const prevData = await prevRes.json().catch(() => ({}));
+            const prev = prevData && typeof prevData === 'object' && prevData.result && typeof prevData.result === 'object' ? prevData.result : {};
+            if (outEl) outEl.innerText = `${formatContentIntegritySummary(prev)}\n\n${JSON.stringify(prev, null, 2)}`;
+            const ok = confirm(`确认执行完整性修复？\nlimit=${lim}\n${formatContentIntegritySummary(prev)}\n将写入数据库。`);
+            if (!ok) return;
+            if (outEl) outEl.innerText = '完整性修复执行中...';
+            const res = await fetchAuth(`${API_BASE}/ops/ai-production/content-integrity-repair/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ limit: lim, confirm_phrase: 'CONTENT_INTEGRITY_REPAIR' })
+            });
+            if (!res || !res.ok) {
+                if (outEl) outEl.innerText = '完整性修复执行失败';
+                return alert('完整性修复执行失败');
+            }
+            const data = await res.json().catch(() => ({}));
+            const r = data && typeof data === 'object' && data.result && typeof data.result === 'object' ? data.result : {};
+            if (outEl) outEl.innerText = `${formatContentIntegritySummary(r)}\n\n${JSON.stringify(r, null, 2)}`;
+            await loadAITasks();
+            alert(`修复完成：fixed=${Number(r.fixed_posts || 0) || 0}`);
+        }
+
+        function formatPostRecoverySummary(r) {
+            const exists = !!(r && r.post_exists);
+            const can = !!(r && r.can_recover_status_to_done);
+            const reason = String(r && r.recovery_reason || '');
+            const jobs = Number(r && r.job_count || 0) || 0;
+            const traces = r && r.trace_counts && typeof r.trace_counts === 'object' ? r.trace_counts : {};
+            const te = Number(traces.post_counter_events || 0) + Number(traces.interactions || 0) + Number(traces.comments || 0) + Number(traces.notification_events || 0) + Number(traces.client_events || 0);
+            return `summary: exists=${exists ? 1 : 0}, can_recover=${can ? 1 : 0}, jobs=${jobs}, traces=${te}, reason=${reason}`;
+        }
+
+        async function previewPostRecovery() {
+            const pid = Math.max(1, Number(document.getElementById('post_recovery_post_id')?.value || 0) || 0);
+            if (!pid) return alert('请输入有效post_id');
+            const outEl = document.getElementById('post_recovery_out');
+            if (outEl) outEl.innerText = '恢复预览中...';
+            const res = await fetchAuth(`${API_BASE}/ops/post-recovery/preview?post_id=${encodeURIComponent(String(pid))}`);
+            if (!res || !res.ok) {
+                if (outEl) outEl.innerText = '恢复预览失败';
+                return alert('恢复预览失败');
+            }
+            const data = await res.json().catch(() => ({}));
+            const r = data && typeof data === 'object' && data.result && typeof data.result === 'object' ? data.result : {};
+            if (outEl) outEl.innerText = `${formatPostRecoverySummary(r)}\n\n${JSON.stringify(r, null, 2)}`;
+            alert(`预览完成：${formatPostRecoverySummary(r)}`);
+        }
+
+        async function executePostRecovery() {
+            const pid = Math.max(1, Number(document.getElementById('post_recovery_post_id')?.value || 0) || 0);
+            if (!pid) return alert('请输入有效post_id');
+            const outEl = document.getElementById('post_recovery_out');
+            if (outEl) outEl.innerText = '执行前预览中...';
+            const prevRes = await fetchAuth(`${API_BASE}/ops/post-recovery/preview?post_id=${encodeURIComponent(String(pid))}`);
+            if (!prevRes || !prevRes.ok) {
+                if (outEl) outEl.innerText = '执行前预览失败';
+                return alert('执行前预览失败');
+            }
+            const prevData = await prevRes.json().catch(() => ({}));
+            const prev = prevData && typeof prevData === 'object' && prevData.result && typeof prevData.result === 'object' ? prevData.result : {};
+            if (outEl) outEl.innerText = `${formatPostRecoverySummary(prev)}\n\n${JSON.stringify(prev, null, 2)}`;
+            const ok = confirm(`确认执行帖子恢复？\npost_id=${pid}\n${formatPostRecoverySummary(prev)}\n将写入数据库。`);
+            if (!ok) return;
+            if (outEl) outEl.innerText = '帖子恢复执行中...';
+            const res = await fetchAuth(`${API_BASE}/ops/post-recovery/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ post_id: pid, confirm_phrase: 'RECOVER_POST_BY_ID' })
+            });
+            if (!res || !res.ok) {
+                if (outEl) outEl.innerText = '帖子恢复执行失败';
+                return alert('帖子恢复执行失败');
+            }
+            const data = await res.json().catch(() => ({}));
+            const r = data && typeof data === 'object' && data.result && typeof data.result === 'object' ? data.result : {};
+            if (outEl) outEl.innerText = `${formatPostRecoverySummary(r.preview || {})}\n\n${JSON.stringify(r, null, 2)}`;
+            await loadAITasks();
+            alert(`恢复完成：action=${String(r.action || 'unknown')}`);
+        }
+
+        function _setPostProbeBadgeFor(badgeId, ok, text) {
+            const el = document.getElementById(String(badgeId || ''));
+            if (!el) return;
+            el.innerText = String(text || (ok ? 'OK' : 'FAIL'));
+            el.style.background = ok ? '#166534' : '#7f1d1d';
+            el.style.color = '#e5e7eb';
+        }
+
+        async function _probeHeadOk(url) {
+            try {
+                const r = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+                return !!(r && r.ok);
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function _parseProbePostIds(inputId) {
+            const raw = String(document.getElementById(String(inputId || ''))?.value || '77,80');
+            const ids = [];
+            for (const x of raw.split(',')) {
+                const n = Number(String(x || '').trim());
+                if (Number.isFinite(n) && n > 0) ids.push(Math.round(n));
+            }
+            return Array.from(new Set(ids));
+        }
+
+        async function _runPostContentProbe(inputId, badgeId, outId) {
+            const ids = _parseProbePostIds(inputId);
+            const outEl = document.getElementById(String(outId || ''));
+            if (!ids.length) {
+                _setPostProbeBadgeFor(badgeId, false, 'FAIL');
+                if (outEl) outEl.innerText = '请输入有效post_id，例如 77,80';
+                return;
+            }
+            if (outEl) outEl.innerText = '探针运行中...';
+            const items = [];
+            let allOk = true;
+            for (const pid of ids) {
+                const row = { post_id: pid, ok: false, reasons: [] };
+                try {
+                    const pr = await fetchAuth(`${API_BASE}/posts/${encodeURIComponent(String(pid))}`, { cache: 'no-store' });
+                    if (!pr || !pr.ok) {
+                        row.reasons.push(`post_api_http_${pr ? pr.status : '0'}`);
+                        items.push(row);
+                        allOk = false;
+                        continue;
+                    }
+                    const p = await pr.json().catch(() => ({}));
+                    row.status = String(p && p.status || '');
+                    row.ai_job_id = String(p && p.ai_job_id || '');
+                    row.cover_url = String(p && p.cover_url || '');
+                    row.video_url = String(p && p.video_url || '');
+                    row.subtitle_tracks = Array.isArray(p && p.subtitle_tracks) ? p.subtitle_tracks : [];
+                    if (row.status !== 'done') row.reasons.push('post_status_not_done');
+                    if (!row.cover_url) row.reasons.push('cover_missing');
+                    if (!row.video_url) row.reasons.push('video_missing');
+                    if (!row.subtitle_tracks.length) row.reasons.push('subtitle_tracks_missing');
+
+                    const coverFull = row.cover_url ? (row.cover_url.startsWith('http') ? row.cover_url : `${location.origin}${row.cover_url}`) : '';
+                    const videoFull = row.video_url ? (row.video_url.startsWith('http') ? row.video_url : `${location.origin}${row.video_url}`) : '';
+                    const subUrl = row.subtitle_tracks.length ? String((row.subtitle_tracks[0] || {}).url || '') : '';
+                    const subFull = subUrl ? (subUrl.startsWith('http') ? subUrl : `${location.origin}${subUrl}`) : '';
+                    row.resource_cover_200 = coverFull ? await _probeHeadOk(coverFull) : false;
+                    row.resource_video_200 = videoFull ? await _probeHeadOk(videoFull) : false;
+                    row.resource_subtitle_200 = subFull ? await _probeHeadOk(subFull) : false;
+                    if (!row.resource_cover_200) row.reasons.push('cover_resource_not_200');
+                    if (!row.resource_video_200) row.reasons.push('video_resource_not_200');
+                    if (!row.resource_subtitle_200) row.reasons.push('subtitle_resource_not_200');
+
+                    const br = await fetchAuth(`${API_BASE}/ai/jobs/by_post/${encodeURIComponent(String(pid))}`, { cache: 'no-store' });
+                    const bj = br && br.ok ? await br.json().catch(() => ({})) : {};
+                    const jid = String((bj && bj.job_id) || '');
+                    row.job_by_post = jid;
+                    if (!jid) {
+                        row.reasons.push('job_id_missing');
+                    } else {
+                        const jr = await fetchAuth(`${API_BASE}/ai/jobs/${encodeURIComponent(jid)}`, { cache: 'no-store' });
+                        if (!jr || !jr.ok) {
+                            row.reasons.push(`job_api_http_${jr ? jr.status : '0'}`);
+                        } else {
+                            const j = await jr.json().catch(() => ({}));
+                            const ps = j && typeof j === 'object' && j.production_script && typeof j.production_script === 'object' ? j.production_script : {};
+                            const scenes = Array.isArray(ps.scenes) ? ps.scenes : [];
+                            const narrAll = scenes.length > 0 ? scenes.every(s => !!String((s && s.narration) || '').trim()) : false;
+                            const subAll = scenes.length > 0 ? scenes.every(s => !!String((s && s.subtitle) || '').trim()) : false;
+                            const scriptCover = !!ps.cover;
+                            row.job_status = String(j && j.status || '');
+                            row.job_scenes = scenes.length;
+                            row.job_narr_all = !!narrAll;
+                            row.job_sub_all = !!subAll;
+                            row.job_script_cover = !!scriptCover;
+                            if (row.job_status !== 'done') row.reasons.push('job_status_not_done');
+                            if (scenes.length <= 0) row.reasons.push('job_scenes_missing');
+                            if (!narrAll) row.reasons.push('job_narration_missing');
+                            if (!subAll) row.reasons.push('job_subtitle_missing');
+                            if (!scriptCover) row.reasons.push('job_cover_missing');
+                        }
+                    }
+                    row.ok = row.reasons.length === 0;
+                    allOk = allOk && row.ok;
+                } catch (e) {
+                    row.reasons.push(`probe_exception_${String(e && e.message || e || 'unknown')}`);
+                    row.ok = false;
+                    allOk = false;
+                }
+                items.push(row);
+            }
+            const out = {
+                ts: Math.floor(Date.now() / 1000),
+                base: String(location.origin || ''),
+                all_ok: !!allOk,
+                post_ids: ids,
+                items
+            };
+            _setPostProbeBadgeFor(badgeId, allOk, allOk ? 'OK' : 'FAIL');
+            if (outEl) outEl.innerText = JSON.stringify(out, null, 2);
+            if (!allOk) alert('探针发现异常，请查看失败原因');
+        }
+
+        async function runPostContentProbePanel() {
+            await _runPostContentProbe('post_probe_ids', 'post_probe_badge', 'post_probe_out');
+        }
+
+        async function runPostContentProbeDashboard() {
+            await _runPostContentProbe('dash_post_probe_ids', 'dash_post_probe_badge', 'dash_post_probe_out');
+        }
+
+        async function togglePostContentProbeWatch() {
+            if (window.__postProbeTimer) {
+                clearInterval(window.__postProbeTimer);
+                window.__postProbeTimer = null;
+                _setPostProbeBadgeFor('post_probe_badge', false, 'WATCH OFF');
+                return;
+            }
+            await runPostContentProbePanel();
+            window.__postProbeTimer = setInterval(() => {
+                runPostContentProbePanel();
+            }, 10000);
+            _setPostProbeBadgeFor('post_probe_badge', true, 'WATCH ON');
+        }
+
+        async function togglePostContentProbeWatchDashboard() {
+            if (window.__postProbeTimerDash) {
+                clearInterval(window.__postProbeTimerDash);
+                window.__postProbeTimerDash = null;
+                _setPostProbeBadgeFor('dash_post_probe_badge', false, 'WATCH OFF');
+                return;
+            }
+            await runPostContentProbeDashboard();
+            window.__postProbeTimerDash = setInterval(() => {
+                runPostContentProbeDashboard();
+            }, 10000);
+            _setPostProbeBadgeFor('dash_post_probe_badge', true, 'WATCH ON');
+        }
+
         async function loadSystem() {
             try { await loadAssetReleases(); } catch (_) {}
             try { await loadAssetsRollout(); } catch (_) {}
             try { await loadFeedRecallConfig(); } catch (_) {}
+            try { await loadAIProductionRuntime(); } catch (_) {}
+            try { await runPostContentProbePanel(); } catch (_) {}
             const d = Number(document.getElementById('cb_metrics_days')?.value || 7) || 7;
+            try {
+                const skw = String(document.getElementById('ssm_sample_event_kw')?.value || '').trim();
+                const kkw = String(document.getElementById('ssm_sample_key_kw')?.value || '').trim();
+                const sst = String(document.getElementById('ssm_sample_status')?.value || '').trim();
+                const slm = Math.max(1, Math.min(100, Number(document.getElementById('ssm_sample_limit')?.value || 50) || 50));
+                const swh = Math.max(1, Math.min(24 * 30, Number(document.getElementById('ssm_sample_window_hours')?.value || 168) || 168));
+                const serr = !!document.getElementById('ssm_sample_only_errors')?.checked;
+                const q = [];
+                q.push(`days=${encodeURIComponent(String(Math.max(1, Math.min(30, d))))}`);
+                q.push(`sample_limit=${encodeURIComponent(String(slm))}`);
+                q.push(`sample_window_hours=${encodeURIComponent(String(swh))}`);
+                if (skw) q.push(`sample_event_kw=${encodeURIComponent(skw)}`);
+                if (kkw) q.push(`sample_key_kw=${encodeURIComponent(kkw)}`);
+                if (sst) q.push(`sample_status=${encodeURIComponent(sst)}`);
+                if (serr) q.push(`sample_only_errors=1`);
+                const rs = await fetchAuth(`${API_BASE}/ops/admin/search-share/metrics?${q.join('&')}`);
+                if (rs && rs.ok) {
+                    const sj = await rs.json();
+                    const totals = sj && typeof sj === 'object' && sj.totals && typeof sj.totals === 'object' ? sj.totals : {};
+                    const summary = sj && typeof sj === 'object' && sj.summary && typeof sj.summary === 'object' ? sj.summary : {};
+                    const series = sj && typeof sj === 'object' && Array.isArray(sj.series) ? sj.series : [];
+                    const samples = sj && typeof sj === 'object' && Array.isArray(sj.samples) ? sj.samples : [];
+                    const sampleStats = sj && typeof sj === 'object' && sj.sample_stats && typeof sj.sample_stats === 'object' ? sj.sample_stats : {};
+                    const storage = sj && typeof sj === 'object' ? String(sj.storage || '') : '';
+                    const put = (id, val) => {
+                        const el = document.getElementById(id);
+                        if (el) el.innerText = String(Math.max(0, Number(val || 0) || 0));
+                    };
+                    put('ssm_create_ok', totals.create_ok);
+                    put('ssm_create_reused', totals.create_reused);
+                    put('ssm_resolve_ok', totals.resolve_ok);
+                    put('ssm_resolve_not_found', totals.resolve_not_found);
+                    put('ssm_resolve_expired', totals.resolve_expired);
+                    put('ssm_resolve_total', summary.resolve_total);
+                    put('ssm_create_client_err', summary.create_client_error_total);
+                    put('ssm_resolve_server_err', summary.resolve_server_error_total);
+                    const hitEl = document.getElementById('ssm_resolve_hit_rate');
+                    if (hitEl) {
+                        const hit = Math.max(0, Math.min(1, Number(summary.resolve_hit_rate || 0) || 0));
+                        const miss = Math.max(0, Math.min(1, Number(summary.resolve_miss_rate || 0) || 0));
+                        hitEl.innerText = `${Math.round(hit * 100)}%`;
+                        hitEl.style.color = miss >= 0.30 ? '#f87171' : (miss >= 0.15 ? '#fbbf24' : '#4ade80');
+                    }
+                    const st = document.getElementById('ssm_storage');
+                    if (st) {
+                        st.innerText = storage === 'redis' ? 'Redis' : (storage ? '本地降级' : '-');
+                        st.style.color = storage === 'redis' ? '#4ade80' : '#fbbf24';
+                    }
+                    const rows = series.map(x => {
+                        const day = x && x.day ? String(x.day) : '';
+                        const m = x && x.metrics && typeof x.metrics === 'object' ? x.metrics : {};
+                        const v1 = Math.max(0, Number(m.create_ok || 0) || 0);
+                        const v2 = Math.max(0, Number(m.create_reused || 0) || 0);
+                        const v3 = Math.max(0, Number(m.resolve_ok || 0) || 0);
+                        const v4 = Math.max(0, Number(m.resolve_not_found || 0) || 0);
+                        const v5 = Math.max(0, Number(m.resolve_expired || 0) || 0);
+                        const v6 = Math.max(0, Math.min(1, Number(m._resolve_hit_rate || 0) || 0));
+                        const v7 = Math.max(0, Number(m._resolve_total || 0) || 0);
+                        const c6 = v6 < 0.7 ? 'text-red-300' : (v6 < 0.85 ? 'text-yellow-300' : 'text-green-300');
+                        return `
+                            <tr class="table-row">
+                                <td class="text-xs text-gray-400">${day}</td>
+                                <td class="text-xs text-gray-300">${v1}</td>
+                                <td class="text-xs text-gray-300">${v2}</td>
+                                <td class="text-xs text-gray-300">${v3}</td>
+                                <td class="text-xs text-gray-300">${v4}</td>
+                                <td class="text-xs text-gray-300">${v5}</td>
+                                <td class="text-xs ${c6}">${Math.round(v6 * 100)}%</td>
+                                <td class="text-xs text-gray-300">${v7}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                    const tb = document.getElementById('ssm_table');
+                    if (tb) tb.innerHTML = rows || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="8">暂无数据</td></tr>`;
+                    const sampleRows = samples.map(it => {
+                        const ts = Math.max(0, Number(it && it.ts || 0) || 0);
+                        const dt = ts ? new Date(ts * 1000).toLocaleString() : '-';
+                        const ev = String(it && it.event || '');
+                        const key = String(it && it.key || '');
+                        const detail = String(it && it.detail || '');
+                        const color = ev.indexOf('_ok') >= 0 ? 'text-green-300' : (ev.indexOf('not_found') >= 0 || ev.indexOf('expired') >= 0 ? 'text-yellow-300' : (ev.indexOf('failed') >= 0 || ev.indexOf('unavailable') >= 0 ? 'text-red-300' : 'text-gray-300'));
+                        return `
+                            <tr class="table-row">
+                                <td class="text-xs text-gray-400">${dt}</td>
+                                <td class="text-xs ${color}">${ev}</td>
+                                <td class="text-xs text-gray-300 font-mono">${key || '-'}</td>
+                                <td class="text-xs text-gray-300">${detail || '-'}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                    const sb = document.getElementById('ssm_samples');
+                    if (sb) sb.innerHTML = sampleRows || `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">暂无样本</td></tr>`;
+                    const sm = document.getElementById('ssm_samples_meta');
+                    const se = document.getElementById('ssm_samples_events');
+                    if (sm) {
+                        const rt = Math.max(0, Number(sampleStats.returned_total || samples.length || 0) || 0);
+                        const st = Math.max(0, Number(sampleStats.scanned_total || 0) || 0);
+                        const wh = Math.max(1, Number(sampleStats.window_hours || swh) || swh);
+                        const sc = sampleStats && typeof sampleStats.status_counts === 'object' ? sampleStats.status_counts : {};
+                        const sr = sampleStats && typeof sampleStats.status_rates === 'object' ? sampleStats.status_rates : {};
+                        const s200 = Math.max(0, Number(sc['200'] || 0) || 0);
+                        const s4 = Math.max(0, Number(sc['4xx'] || 0) || 0);
+                        const s5 = Math.max(0, Number(sc['5xx'] || 0) || 0);
+                        const okp = Math.max(0, Math.min(1, Number(sr.ok || 0) || 0));
+                        const e4p = Math.max(0, Math.min(1, Number(sr.err4xx || 0) || 0));
+                        const e5p = Math.max(0, Math.min(1, Number(sr.err5xx || 0) || 0));
+                        const hl = String(sampleStats.health_level || 'healthy');
+                        const hr = String(sampleStats.health_reason || 'ok');
+                        const ha = !!sampleStats.health_alert;
+                        const al = String(sampleStats.alert_level || 'info');
+                        const sa = String(sampleStats.suggested_action || 'observe');
+                        const ap = Math.max(0, Number(sampleStats.action_priority || 0) || 0);
+                        const rm = Math.max(1, Number(sampleStats.recommended_recheck_minutes || 120) || 120);
+                        const ads = Math.max(0, Number(sampleStats.action_due_ts || 0) || 0);
+                        const ast = String(sampleStats.action_status || 'idle');
+                        const adis = Number(sampleStats.action_due_in_seconds || 0) || 0;
+                        const aov = !!sampleStats.action_overdue;
+                        const aom = Math.max(0, Number(sampleStats.action_overdue_minutes || 0) || 0);
+                        const bcl = String(sampleStats.breach_level || 'none');
+                        const ech = String(sampleStats.escalation_hint || 'monitor');
+                        const erq = !!sampleStats.escalation_required;
+                        const edt = Math.max(0, Number(sampleStats.escalation_deadline_ts || 0) || 0);
+                        const edi = Number(sampleStats.escalation_due_in_seconds || 0) || 0;
+                        const eug = String(sampleStats.escalation_urgency || 'normal');
+                        const ewo = !!sampleStats.escalation_window_overdue;
+                        const est = String(sampleStats.escalation_stage || 'not_required');
+                        const esl = String(sampleStats.escalation_sla_level || 'none');
+                        const epa = String(sampleStats.escalation_playbook_action || 'observe');
+                        const etm = Math.max(0, Number(sampleStats.escalation_target_response_minutes || 0) || 0);
+                        const eor = String(sampleStats.escalation_owner_role || 'observer');
+                        const eas = String(sampleStats.escalation_ack_status || 'not_required');
+                        const ead = Math.max(0, Number(sampleStats.escalation_ack_due_ts || 0) || 0);
+                        const eai = Number(sampleStats.escalation_ack_due_in_seconds || 0) || 0;
+                        const abl = String(sampleStats.ack_breach_level || 'none');
+                        const ana = String(sampleStats.ack_nudge_action || 'none');
+                        const anc = String(sampleStats.ack_nudge_channel || 'none');
+                        const anu = String(sampleStats.ack_nudge_urgency || 'normal');
+                        const anr = Math.max(0, Number(sampleStats.ack_nudge_retry_count || 0) || 0);
+                        const ant = Math.max(0, Number(sampleStats.ack_nudge_next_ts || 0) || 0);
+                        const ani = Number(sampleStats.ack_nudge_next_in_seconds || 0) || 0;
+                        const anb = Math.max(0, Number(sampleStats.ack_nudge_backoff_minutes || 0) || 0);
+                        const ans = String(sampleStats.ack_nudge_state || 'idle');
+                        const aac = Math.max(0, Number(sampleStats.ack_nudge_attempted_count || 0) || 0);
+                        const asr = Math.max(0, Math.min(1, Number(sampleStats.ack_nudge_success_rate || 0) || 0));
+                        const aqg = String(sampleStats.ack_nudge_quality_grade || 'excellent');
+                        const aqr = String(sampleStats.ack_nudge_recommendation || 'keep_current_strategy');
+                        const aqs = Math.max(0, Math.min(100, Number(sampleStats.ack_nudge_quality_score || 0) || 0));
+                        const aqc = String(sampleStats.ack_nudge_quality_confidence || 'high');
+                        const aqps = Math.max(0, Math.min(100, Number(sampleStats.ack_nudge_quality_prev_score || 0) || 0));
+                        const aqtd = Number(sampleStats.ack_nudge_quality_trend_delta || 0) || 0;
+                        const aqdir = String(sampleStats.ack_nudge_quality_trend_direction || 'stable');
+                        const aqtc = String(sampleStats.ack_nudge_quality_trend_confidence || 'low');
+                        const aqtal = String(sampleStats.ack_nudge_quality_trend_alert_level || 'info');
+                        const aqtr = String(sampleStats.ack_nudge_quality_trend_recommendation || 'keep_strategy');
+                        const ter = !!sampleStats.trend_escalation_required;
+                        const tes = String(sampleStats.trend_escalation_stage || 'observe');
+                        const teor = String(sampleStats.trend_escalation_owner_role || 'observer');
+                        const tepa = String(sampleStats.trend_escalation_playbook_action || 'observe');
+                        const tetr = Math.max(0, Number(sampleStats.trend_escalation_target_response_minutes || 0) || 0);
+                        const eer = !!sampleStats.effective_escalation_required;
+                        const eeor = String(sampleStats.effective_escalation_owner_role || 'observer');
+                        const eepa = String(sampleStats.effective_escalation_playbook_action || 'observe');
+                        const eetr = Math.max(0, Number(sampleStats.effective_escalation_target_response_minutes || 0) || 0);
+                        const ees = String(sampleStats.effective_escalation_source || 'base');
+                        const eeu = String(sampleStats.effective_escalation_urgency || 'normal');
+                        const eeDueTs = Math.max(0, Number(sampleStats.effective_escalation_due_ts || 0) || 0);
+                        const eeDueIn = Number(sampleStats.effective_escalation_due_in_seconds || 0) || 0;
+                        const eeOverdue = !!sampleStats.effective_escalation_overdue;
+                        const eeDueMin = Math.max(0, Number(sampleStats.effective_escalation_due_in_minutes || 0) || 0);
+                        const eeBreach = String(sampleStats.effective_escalation_breach_level || 'none');
+                        const eeFollowup = String(sampleStats.effective_escalation_followup_action || 'observe');
+                        const eeFollowupRequired = !!sampleStats.effective_escalation_followup_required;
+                        const eeFollowupDueMin = Math.max(0, Number(sampleStats.effective_escalation_followup_due_minutes || 0) || 0);
+                        const eeFollowupDueTs = Math.max(0, Number(sampleStats.effective_escalation_followup_due_ts || 0) || 0);
+                        const eeFollowupDueIn = Number(sampleStats.effective_escalation_followup_due_in_seconds || 0) || 0;
+                        const eeFollowupStatus = String(sampleStats.effective_escalation_followup_status || 'not_required');
+                        const eeFollowupChannel = String(sampleStats.effective_escalation_followup_channel || 'none');
+                        const eeFollowupUrgency = String(sampleStats.effective_escalation_followup_urgency || 'normal');
+                        const eeFollowupRetry = Math.max(0, Number(sampleStats.effective_escalation_followup_retry_count || 0) || 0);
+                        const eeFollowupBackoff = Math.max(0, Number(sampleStats.effective_escalation_followup_backoff_minutes || 0) || 0);
+                        const eeFollowupNextTs = Math.max(0, Number(sampleStats.effective_escalation_followup_next_ts || 0) || 0);
+                        const eeFollowupNextIn = Number(sampleStats.effective_escalation_followup_next_in_seconds || 0) || 0;
+                        const eeFollowupState = String(sampleStats.effective_escalation_followup_state || 'idle');
+                        const eeFollowupQualityScore = Math.max(0, Math.min(100, Number(sampleStats.effective_escalation_followup_quality_score || 0) || 0));
+                        const eeFollowupQualityGrade = String(sampleStats.effective_escalation_followup_quality_grade || 'excellent');
+                        const eeFollowupQualityReco = String(sampleStats.effective_escalation_followup_quality_recommendation || 'keep_current_followup');
+                        const eeFollowupQualityPrev = Math.max(0, Math.min(100, Number(sampleStats.effective_escalation_followup_quality_prev_score || 0) || 0));
+                        const eeFollowupQualityTrendDelta = Number(sampleStats.effective_escalation_followup_quality_trend_delta || 0) || 0;
+                        const eeFollowupQualityTrendDir = String(sampleStats.effective_escalation_followup_quality_trend_direction || 'stable');
+                        const eeFollowupQualityTrendConf = String(sampleStats.effective_escalation_followup_quality_trend_confidence || 'low');
+                        const eeFollowupQualityTrendAlert = String(sampleStats.effective_escalation_followup_quality_trend_alert_level || 'info');
+                        const eeFollowupQualityTrendReco = String(sampleStats.effective_escalation_followup_quality_trend_recommendation || 'keep_followup_strategy');
+                        const ab = String(sampleStats.action_bucket || 'observe');
+                        const an = String(sampleStats.action_note || 'passive_observation');
+                        const atxt = al === 'critical' ? '严重' : (al === 'warning' ? '警告' : (al === 'notice' ? '提示' : '信息'));
+                        const astxt = ast === 'active' ? '执行中' : (ast === 'scheduled' ? '待复检' : '观察中');
+                        const abtxt = ab === 'immediate' ? '立即处置' : (ab === 'soon' ? '尽快处置' : (ab === 'today' ? '今日处置' : '持续观察'));
+                        const btxt = bcl === 'critical' ? '严重违约' : (bcl === 'major' ? '重大违约' : (bcl === 'minor' ? '轻度违约' : '无违约'));
+                        const etxt = ech === 'page_oncall_owner'
+                            ? '呼叫值班负责人'
+                            : (ech === 'notify_feature_owner' ? '通知功能负责人' : (ech === 'postpone_noncritical_work' ? '推迟非关键任务' : '持续监控'));
+                        const esTxt = erq ? '强制升级' : '可观察';
+                        const edTxt = edt > 0 ? tsFmt(edt) : '-';
+                        const euTxt = eug === 'critical' ? '紧急' : (eug === 'warning' ? '临近' : '正常');
+                        const estTxt = est === 'breached' ? '窗口违约' : (est === 'expiring' ? '窗口临期' : (est === 'active' ? '窗口有效' : '无需升级'));
+                        const eslTxt = esl === 'sev1' ? 'SLA-S1' : (esl === 'sev2' ? 'SLA-S2' : (esl === 'sev3' ? 'SLA-S3' : 'SLA-N/A'));
+                        const epaTxt = epa === 'trigger_incident_bridge'
+                            ? '拉起事故桥接会议'
+                            : (epa === 'start_owner_warroom'
+                                ? '启动负责人战情室'
+                                : (epa === 'assign_primary_owner' ? '指定主责任人' : '持续观察'));
+                        const eorTxt = eor === 'incident_commander'
+                            ? '事故指挥官'
+                            : (eor === 'feature_owner' ? '功能负责人' : (eor === 'duty_engineer' ? '值班工程师' : '观察角色'));
+                        const easTxt = eas === 'overdue' ? '确认超时' : (eas === 'pending' ? '待确认' : '无需确认');
+                        const eaDueTxt = ead > 0 ? tsFmt(ead) : '-';
+                        const eaLagTxt = eas === 'pending'
+                            ? `确认剩余${Math.max(0, Math.round(Math.max(0, eai) / 60))}分钟`
+                            : (eas === 'overdue' ? `确认超时${Math.max(1, Math.round(Math.abs(eai) / 60))}分钟` : '无需确认时效');
+                        const ablTxt = abl === 'critical' ? '确认严重违约' : (abl === 'major' ? '确认重大违约' : (abl === 'minor' ? '确认轻度违约' : '确认无违约'));
+                        const anaTxt = ana === 'escalate_to_incident_commander'
+                            ? '升级至事故指挥官'
+                            : (ana === 'page_feature_owner' ? '通知功能负责人' : (ana === 'remind_duty_engineer' ? '提醒值班工程师' : '无需催办'));
+                        const ancTxt = anc === 'phone_call' ? '电话' : (anc === 'pager' ? 'Pager' : (anc === 'chatops' ? 'ChatOps' : '无'));
+                        const anuTxt = anu === 'critical' ? '紧急' : (anu === 'high' ? '高' : (anu === 'medium' ? '中' : '常规'));
+                        const antTxt = ant > 0 ? tsFmt(ant) : '-';
+                        const aniTxt = ant > 0 ? `剩余${Math.max(0, Math.round(Math.max(0, ani) / 60))}分钟` : '无需下次催办';
+                        const ansTxt = ans === 'scheduled' ? '已调度' : '空闲';
+                        const aqgTxt = aqg === 'poor' ? '较差' : (aqg === 'fair' ? '一般' : (aqg === 'good' ? '良好' : '优秀'));
+                        const aqrTxt = aqr === 'escalate_channel_and_owner'
+                            ? '升级通道并提升责任人'
+                            : (aqr === 'increase_retry_frequency' ? '提高重试频率' : (aqr === 'keep_and_monitor' ? '保持并持续监控' : '保持当前策略'));
+                        const aqcTxt = aqc === 'low' ? '低' : (aqc === 'medium' ? '中' : '高');
+                        const aqdirTxt = aqdir === 'improving' ? '改善' : (aqdir === 'worsening' ? '恶化' : '稳定');
+                        const aqdeltaTxt = aqtd > 0 ? `+${Math.round(Math.abs(aqtd))}` : (aqtd < 0 ? `-${Math.round(Math.abs(aqtd))}` : '0');
+                        const aqtcTxt = aqtc === 'high' ? '高' : (aqtc === 'medium' ? '中' : '低');
+                        const aqtalTxt = aqtal === 'critical' ? '严重' : (aqtal === 'warning' ? '警告' : (aqtal === 'notice' ? '提示' : '信息'));
+                        const aqtrTxt = aqtr === 'escalate_owner_and_channel'
+                            ? '升级责任人并切换催办通道'
+                            : (aqtr === 'increase_retry_and_monitor'
+                                ? '提高重试频率并重点监控'
+                                : (aqtr === 'tighten_observation_window'
+                                    ? '缩短观察窗口并快速复检'
+                                    : (aqtr === 'reduce_nudge_frequency'
+                                        ? '可适度降低催办频率'
+                                        : (aqtr === 'collect_more_samples'
+                                            ? '先补充样本再决策'
+                                            : (aqtr === 'keep_and_monitor' ? '保持并持续监控' : '保持当前策略')))));
+                        const tesTxt = tes === 'critical' ? '趋势严重' : (tes === 'warning' ? '趋势预警' : (tes === 'notice' ? '趋势提示' : '趋势观察'));
+                        const teorTxt = teor === 'incident_commander'
+                            ? '事故指挥官'
+                            : (teor === 'feature_owner' ? '功能负责人' : (teor === 'duty_engineer' ? '值班工程师' : '观察角色'));
+                        const tepaTxt = tepa === 'trigger_incident_bridge'
+                            ? '拉起事故桥接会议'
+                            : (tepa === 'start_owner_warroom'
+                                ? '启动负责人战情室'
+                                : (tepa === 'assign_primary_owner' ? '指定主责任人' : '持续观察'));
+                        const trendEscTxt = ter ? `${tesTxt}/${teorTxt}/${tepaTxt}/${tetr}分钟` : '趋势未触发升级';
+                        const eeorTxt = eeor === 'incident_commander'
+                            ? '事故指挥官'
+                            : (eeor === 'feature_owner' ? '功能负责人' : (eeor === 'duty_engineer' ? '值班工程师' : '观察角色'));
+                        const eepaTxt = eepa === 'trigger_incident_bridge'
+                            ? '拉起事故桥接会议'
+                            : (eepa === 'start_owner_warroom'
+                                ? '启动负责人战情室'
+                                : (eepa === 'assign_primary_owner' ? '指定主责任人' : '持续观察'));
+                        const eesTxt = ees === 'trend' ? '趋势驱动' : (ees === 'base_and_trend' ? '基础+趋势' : '基础规则');
+                        const eeuTxt = eeu === 'critical' ? '紧急' : (eeu === 'high' ? '高' : (eeu === 'medium' ? '中' : '常规'));
+                        const eeDueTxt = eeDueTs > 0 ? tsFmt(eeDueTs) : '-';
+                        const eeLagTxt = eeOverdue ? `已超时${Math.max(1, Math.round(Math.abs(eeDueIn) / 60))}分钟` : `剩余${Math.max(0, Math.round(Math.max(0, eeDueIn) / 60))}分钟`;
+                        const eeBreachTxt = eeBreach === 'critical' ? '严重违约' : (eeBreach === 'major' ? '重大违约' : (eeBreach === 'minor' ? '轻度违约' : '未违约'));
+                        const eeFollowupTxt = eeFollowup === 'page_incident_manager'
+                            ? '呼叫事故经理'
+                            : (eeFollowup === 'notify_feature_owner'
+                                ? '通知功能负责人'
+                                : (eeFollowup === 'remind_duty_engineer' ? '提醒值班工程师' : '持续观察'));
+                        const eeFollowupChannelTxt = eeFollowupChannel === 'phone_call' ? '电话' : (eeFollowupChannel === 'pager' ? 'Pager' : (eeFollowupChannel === 'chatops' ? 'ChatOps' : '无'));
+                        const eeFollowupUrgencyTxt = eeFollowupUrgency === 'critical' ? '紧急' : (eeFollowupUrgency === 'high' ? '高' : (eeFollowupUrgency === 'medium' ? '中' : '常规'));
+                        const eeFollowupStatusTxt = eeFollowupStatus === 'overdue' ? '已超时' : (eeFollowupStatus === 'pending' ? '待执行' : '无需跟进');
+                        const eeFollowupDueTxt = eeFollowupDueTs > 0 ? tsFmt(eeFollowupDueTs) : '-';
+                        const eeFollowupLagTxt = eeFollowupStatus === 'overdue'
+                            ? `超时${Math.max(1, Math.round(Math.abs(eeFollowupDueIn) / 60))}分钟`
+                            : `剩余${Math.max(0, Math.round(Math.max(0, eeFollowupDueIn) / 60))}分钟`;
+                        const eeFollowupStateTxt = eeFollowupState === 'scheduled' ? '已调度' : '空闲';
+                        const eeFollowupNextTxt = eeFollowupNextTs > 0 ? tsFmt(eeFollowupNextTs) : '-';
+                        const eeFollowupNextLagTxt = eeFollowupNextTs > 0 ? `剩余${Math.max(0, Math.round(Math.max(0, eeFollowupNextIn) / 60))}分钟` : '无需重试';
+                        const eeFollowupQualityGradeTxt = eeFollowupQualityGrade === 'poor' ? '较差' : (eeFollowupQualityGrade === 'fair' ? '一般' : (eeFollowupQualityGrade === 'good' ? '良好' : '优秀'));
+                        const eeFollowupQualityRecoTxt = eeFollowupQualityReco === 'escalate_followup_owner'
+                            ? '升级跟进责任人'
+                            : (eeFollowupQualityReco === 'increase_followup_frequency'
+                                ? '提高跟进频率'
+                                : (eeFollowupQualityReco === 'maintain_and_watch' ? '保持并重点观察' : '保持当前跟进策略'));
+                        const eeFollowupQualityTrendDirTxt = eeFollowupQualityTrendDir === 'improving' ? '改善' : (eeFollowupQualityTrendDir === 'worsening' ? '恶化' : '稳定');
+                        const eeFollowupQualityTrendDeltaTxt = eeFollowupQualityTrendDelta > 0
+                            ? `+${Math.round(Math.abs(eeFollowupQualityTrendDelta))}`
+                            : (eeFollowupQualityTrendDelta < 0 ? `-${Math.round(Math.abs(eeFollowupQualityTrendDelta))}` : '0');
+                        const eeFollowupQualityTrendConfTxt = eeFollowupQualityTrendConf === 'high' ? '高' : (eeFollowupQualityTrendConf === 'medium' ? '中' : '低');
+                        const eeFollowupQualityTrendAlertTxt = eeFollowupQualityTrendAlert === 'critical' ? '严重' : (eeFollowupQualityTrendAlert === 'warning' ? '警告' : (eeFollowupQualityTrendAlert === 'notice' ? '提示' : '信息'));
+                        const eeFollowupQualityTrendRecoTxt = eeFollowupQualityTrendReco === 'escalate_followup_owner_and_channel'
+                            ? '升级责任人并切换跟进通道'
+                            : (eeFollowupQualityTrendReco === 'increase_retry_frequency'
+                                ? '提高重试频率'
+                                : (eeFollowupQualityTrendReco === 'tighten_followup_window'
+                                    ? '缩短跟进窗口'
+                                    : (eeFollowupQualityTrendReco === 'reduce_retry_frequency'
+                                        ? '可降低重试频率'
+                                        : (eeFollowupQualityTrendReco === 'collect_more_samples'
+                                            ? '先补充样本再判断'
+                                            : (eeFollowupQualityTrendReco === 'keep_and_monitor' ? '保持并持续监控' : '保持当前跟进策略')))));
+                        const eeFollowupPackTxt = eeFollowupRequired
+                            ? `${eeFollowupTxt}/${eeFollowupChannelTxt}/${eeFollowupUrgencyTxt}/${eeFollowupStatusTxt}/${eeFollowupDueMin}分钟/${eeFollowupDueTxt}/${eeFollowupLagTxt}/状态:${eeFollowupStateTxt}/重试:${eeFollowupRetry}次/退避:${eeFollowupBackoff}分钟/下次:${eeFollowupNextTxt}/${eeFollowupNextLagTxt}/质量:${eeFollowupQualityGradeTxt}(${eeFollowupQualityScore})/上一窗口:${eeFollowupQualityPrev}/趋势:${eeFollowupQualityTrendDirTxt}(${eeFollowupQualityTrendDeltaTxt})/趋势置信:${eeFollowupQualityTrendConfTxt}/趋势告警:${eeFollowupQualityTrendAlertTxt}/趋势建议:${eeFollowupQualityTrendRecoTxt}/建议:${eeFollowupQualityRecoTxt}`
+                            : '无需跟进';
+                        const effectiveEscTxt = eer ? `${eeorTxt}/${eepaTxt}/${eetr}分钟/${eesTxt}/${eeuTxt}/${eeDueTxt}/${eeLagTxt}/时差:${eeDueMin}分钟/${eeBreachTxt}/跟进:${eeFollowupPackTxt}` : '无有效升级';
+                        const ewTxt = erq ? (edi <= 0 ? '升级窗口已到期' : `升级窗口剩余${Math.max(0, Math.round(edi / 60))}分钟`) : '升级窗口未启用';
+                        const dueTxt = ads > 0 ? tsFmt(ads) : '-';
+                        const lagTxt = aov ? `已超时${Math.max(1, Math.round(Math.abs(adis) / 60))}分钟` : `剩余${Math.max(0, Math.round(Math.max(0, adis) / 60))}分钟`;
+                        const antxt = an === 'backend_chain_check'
+                            ? '核查后端链路健康'
+                            : (an === 'error_spike_triage'
+                                ? '定位错误突增入口'
+                                : (an === 'client_pattern_review'
+                                    ? '分析客户端错误模式'
+                                    : (an === 'sample_expansion' ? '补充样本后再评估' : '保持观察')));
+                        const satxt = sa === 'check_backend_5xx'
+                            ? '检查后端5xx与依赖链路'
+                            : (sa === 'investigate_error_spike'
+                                ? '排查错误突增来源'
+                                : (sa === 'check_client_error_pattern'
+                                    ? '检查客户端错误模式'
+                                    : (sa === 'collect_more_samples' ? '扩大样本后再判断' : '继续观察')));
+                        const htxt = hl === 'critical' ? '风险' : (hl === 'warning' ? '预警' : (hl === 'insufficient' ? '样本不足' : '健康'));
+                        sm.innerText = `近${wh}小时：${ha ? '告警' : '正常'}，级别:${atxt}，优先级:P${ap}，状态:${astxt}${aov ? '（超时）' : ''}，违约:${btxt}${aom > 0 ? `(${aom}分钟)` : ''}，升级:${etxt}（${esTxt}，阶段:${estTxt}${ewo ? '（违约）' : ''}，时限:${edTxt}，紧急度:${euTxt}，级别:${eslTxt}，动作:${epaTxt}，响应目标:${etm}分钟，责任:${eorTxt}，确认:${easTxt}(截止:${eaDueTxt}，${eaLagTxt}，${ablTxt}，催办:${anaTxt}，通道:${ancTxt}，催办紧急度:${anuTxt}，状态:${ansTxt}，退避:${anb}分钟，重试:${anr}次，执行:${aac}次，成功率:${Math.round(asr * 100)}%，质量:${aqgTxt}，评分:${aqs}，上一窗口:${aqps}，趋势:${aqdirTxt}(${aqdeltaTxt})，趋势置信:${aqtcTxt}，趋势告警:${aqtalTxt}，趋势建议:${aqtrTxt}，趋势升级:${trendEscTxt}，有效升级:${effectiveEscTxt}，置信度:${aqcTxt}，建议:${aqrTxt}，下次:${antTxt}，${aniTxt})，${ewTxt}），策略:${abtxt}（${antxt}），${htxt}（${hr}），建议:${satxt}，复检:${rm}分钟（截止:${dueTxt}，${lagTxt}），返回 ${rt} 条 / 扫描 ${st} 条（200:${s200} 4xx:${s4} 5xx:${s5}，命中:${Math.round(okp * 100)}% 4xx:${Math.round(e4p * 100)}% 5xx:${Math.round(e5p * 100)}%）`;
+                        sm.style.color = hl === 'critical' ? '#f87171' : (hl === 'warning' ? '#fbbf24' : (hl === 'insufficient' ? '#93c5fd' : '#9ca3af'));
+                    }
+                    if (se) {
+                        const tr = sampleStats && typeof sampleStats.health_trend === 'object' ? sampleStats.health_trend : {};
+                        const td = String(tr.direction || 'unknown');
+                        const dv = Number(tr.delta_err5_rate || 0) || 0;
+                        const tc = String(tr.confidence || 'low');
+                        const ta = !!tr.alert;
+                        const tctxt = tc === 'high' ? '高' : (tc === 'medium' ? '中' : '低');
+                        const trendTxt = td === 'worsening'
+                            ? `趋势 恶化 +${Math.round(Math.abs(dv) * 100)}%`
+                            : (td === 'improving'
+                                ? `趋势 改善 -${Math.round(Math.abs(dv) * 100)}%`
+                                : (td === 'stable' ? '趋势 稳定' : '趋势 基线不足'));
+                        const top = Array.isArray(sampleStats.event_top) ? sampleStats.event_top : [];
+                        const txt = top.slice(0, 3).map(x => {
+                            const ev = String(x && x.event || '');
+                            const c = Math.max(0, Number(x && x.count || 0) || 0);
+                            return ev ? `${ev}:${c}` : '';
+                        }).filter(Boolean).join(' | ');
+                        const trendMeta = `${trendTxt}（置信:${tctxt}${ta ? ' 告警' : ''}）`;
+                        se.innerText = txt ? `${trendMeta} | Top事件 ${txt}` : trendMeta;
+                        se.style.color = td === 'worsening' ? '#f87171' : (td === 'improving' ? '#4ade80' : '#9ca3af');
+                    }
+                }
+            } catch (_) {
+                const tb = document.getElementById('ssm_table');
+                if (tb) tb.innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="8">加载失败</td></tr>`;
+                const sb = document.getElementById('ssm_samples');
+                if (sb) sb.innerHTML = `<tr class="table-row"><td class="text-xs text-gray-500" colspan="4">加载失败</td></tr>`;
+                const sm = document.getElementById('ssm_samples_meta');
+                if (sm) sm.innerText = '样本加载失败';
+                const se = document.getElementById('ssm_samples_events');
+                if (se) se.innerText = '';
+            }
             try {
                 const rth = await fetchAuth(`${API_BASE}/posts/admin/metrics/worker-callback/thresholds`);
                 if (rth && rth.ok) {
@@ -1688,7 +3120,7 @@
         // Init
         try {
             window.app = window.app || {};
-            Object.assign(window.app, { switchTab, adminLogout, adminLogin, loadUsers, loadContent, loadAITasks, setAiJobStatus, adminCancelAIJob, loadAudit, loadSystem, loadApiMonitor, applyContentDatePreset, loadAssetReleases, activateAssetRelease, loadAssetsRollout, saveAssetsRollout, runAssetsRolloutGuard, loadFeedRecallConfig, saveFeedRecallConfig, exportWorkerCallbackSamples, exportWorkerCallbackAlerts, saveWorkerCallbackThresholds, ackWorkerCallbackAlert, ackFilteredWorkerCallbackAlerts, ackTodayWorkerCallbackAlerts, adminReviewDecision, adminBanUser, adminUnbanUser, adminSetReputation, adminBulkBanUsers, adminRemovePost, adminRestorePost, adminDeletePost, adminPurgePost, adminBulkRemove, adminBulkDelete, adminBulkDeleteRemoved });
+            Object.assign(window.app, { switchTab, adminLogout, adminLogin, loadUsers, loadContent, loadAITasks, setAiJobStatus, adminCancelAIJob, adminReleaseAIJobHold, loadAudit, loadSystem, loadApiMonitor, applyContentDatePreset, loadAssetReleases, activateAssetRelease, loadAssetsRollout, saveAssetsRollout, runAssetsRolloutGuard, loadFeedRecallConfig, saveFeedRecallConfig, loadAIProductionRuntime, saveAIProductionRuntime, loadAIProductionAudit, applyAIProductionAuditReasonFilter, applyAIProductionAuditDayFilter, exportAIProductionAuditJson, exportAIProductionAuditCsv, applyAIProductionAdaptiveSuggestion, checkAIProductionAdaptiveRollback, runAIProductionReleaseTick, releaseAIProductionHold, exportWorkerCallbackSamples, exportSearchShareSamples, exportWorkerCallbackAlerts, saveWorkerCallbackThresholds, ackWorkerCallbackAlert, ackFilteredWorkerCallbackAlerts, ackTodayWorkerCallbackAlerts, adminReviewDecision, adminBanUser, adminUnbanUser, adminSetReputation, adminBulkBanUsers, adminRemovePost, adminRestorePost, adminDeletePost, adminPurgePost, adminBulkRemove, adminBulkDelete, adminBulkDeleteRemoved });
         } catch (_) {
         }
         try {
@@ -1710,6 +3142,32 @@
                     if (currentTab === 'system') loadSystem();
                 });
             }
+        } catch (_) {
+        }
+        try {
+            const fireSystemReload = (() => {
+                let timer = 0;
+                return () => {
+                    if (timer) {
+                        try { clearTimeout(timer); } catch (_) {}
+                    }
+                    timer = setTimeout(() => {
+                        if (currentTab === 'system') loadSystem();
+                    }, 280);
+                };
+            })();
+            ['ssm_sample_event_kw', 'ssm_sample_key_kw', 'ssm_sample_status', 'ssm_sample_limit', 'ssm_sample_window_hours', 'ssm_sample_only_errors'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('change', () => {
+                    fireSystemReload();
+                });
+                if (id === 'ssm_sample_event_kw' || id === 'ssm_sample_key_kw') {
+                    el.addEventListener('input', () => {
+                        fireSystemReload();
+                    });
+                }
+            });
         } catch (_) {
         }
         try {

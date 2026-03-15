@@ -3,6 +3,7 @@ import json
 import time
 import hmac
 import hashlib
+import re
 import httpx
 from typing import List, Optional
 
@@ -16,6 +17,58 @@ logger = get_logger(__name__)
 
 _HTTP: Optional[httpx.AsyncClient] = None
 _LAST_CB: dict = {}
+
+
+def _tight_line(s: str, max_len: int) -> str:
+    t = re.sub(r"\s+", " ", str(s or "").strip())
+    if not t:
+        return ""
+    if len(t) <= int(max_len):
+        return t
+    parts = re.split(r"[，。！？；,.!?;:：]\s*", t)
+    out = ""
+    for p in parts:
+        p = str(p or "").strip()
+        if not p:
+            continue
+        cand = (out + ("，" if out else "") + p).strip()
+        if len(cand) <= int(max_len):
+            out = cand
+        else:
+            if not out:
+                out = p[: int(max_len)]
+            break
+    if not out:
+        out = t[: int(max_len)]
+    return out.strip("，。！？；：,.!?;:")
+
+
+def _sanitize_draft_payload(draft_json: Optional[dict]) -> Optional[dict]:
+    if not isinstance(draft_json, dict):
+        return draft_json
+    out = dict(draft_json)
+    scenes = out.get("scenes") if isinstance(out.get("scenes"), list) else []
+    fixed = []
+    for s in scenes:
+        if not isinstance(s, dict):
+            continue
+        s2 = dict(s)
+        nar = _tight_line(str(s2.get("narration") or ""), 58)
+        sub = _tight_line(str(s2.get("subtitle") or ""), 22)
+        if not sub:
+            sub = _tight_line(nar, 22)
+        s2["narration"] = nar
+        s2["subtitle"] = sub
+        fixed.append(s2)
+    if fixed:
+        out["scenes"] = fixed
+    cov = out.get("cover") if isinstance(out.get("cover"), dict) else None
+    if isinstance(cov, dict):
+        c2 = dict(cov)
+        c2["title_text"] = _tight_line(str(c2.get("title_text") or ""), 18)
+        c2["subtitle_text"] = _tight_line(str(c2.get("subtitle_text") or ""), 24)
+        out["cover"] = c2
+    return out
 
 
 def _get_http() -> httpx.AsyncClient:
@@ -89,6 +142,9 @@ async def callback_web(
     assistant_message: Optional[str] = None,
     no_post_status: Optional[bool] = None,
     subtitle_tracks: Optional[list] = None,
+    analysis_audit: Optional[dict] = None,
+    subtitle_audit: Optional[dict] = None,
+    generation_quality: Optional[dict] = None,
     placeholder_trace: Optional[list] = None,
     placeholder_audit: Optional[dict] = None,
     cover_trace: Optional[list] = None,
@@ -103,6 +159,10 @@ async def callback_web(
     try:
         if stage and draft_json is not None and not allow_draft_write(stage):
             draft_json = None
+    except Exception:
+        pass
+    try:
+        draft_json = _sanitize_draft_payload(draft_json)
     except Exception:
         pass
     try:
@@ -133,6 +193,9 @@ async def callback_web(
         "title": job_data.get("title"),
         "summary": job_data.get("summary"),
         "subtitle_tracks": subtitle_tracks,
+        "analysis_audit": analysis_audit,
+        "subtitle_audit": subtitle_audit,
+        "generation_quality": generation_quality,
         "placeholder_trace": placeholder_trace,
         "placeholder_audit": placeholder_audit,
         "cover_trace": cover_trace,

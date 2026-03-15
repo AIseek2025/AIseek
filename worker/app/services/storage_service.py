@@ -23,13 +23,20 @@ class StorageService:
 
     def upload_file(self, file_path: str, object_name: str = None, content_type: str = "video/mp4", cache_control: str = None) -> str:
         """
-        Upload a file to Cloudflare R2 bucket.
+        Upload a file to Cloudflare R2 bucket or local filesystem fallback.
         """
         if not self.client:
             try:
                 src = str(file_path or "")
                 if not src or not os.path.exists(src):
+                    logger.warning(f"upload_file: source file missing or empty: {src}")
                     return None
+                
+                src_size = os.path.getsize(src)
+                if src_size == 0:
+                    logger.warning(f"upload_file: source file is empty (0 bytes): {src}")
+                    return None
+                
                 rel = str(object_name or "").strip().lstrip("/")
                 if not rel:
                     rel = os.path.basename(src)
@@ -37,32 +44,35 @@ class StorageService:
                 p = Path(__file__).resolve()
                 repo_root = p.parents[3]
                 
-                # Explicitly check for Docker bind mount location first
                 if Path("/app/backend/static").exists():
                     out_root = Path("/app/backend/static/worker_media")
                 else:
-                    # Check for Docker structure relative to this file
                     if len(p.parents) > 1 and (p.parents[1] / "backend").exists():
                         repo_root = p.parents[1]
                     elif len(p.parents) > 2 and (p.parents[2] / "backend").exists():
                         repo_root = p.parents[2]
                     out_root = repo_root / "backend" / "static" / "worker_media"
 
-                logger.info(f"Local upload target: {out_root} (rel={rel})")
+                logger.info(f"Local upload: {src} ({src_size} bytes) -> {out_root / rel}")
                 
                 dst = out_root / rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
                 
-                # Ensure permissions are correct for Nginx (readable by others)
                 try:
                     os.chmod(dst, 0o644)
                 except Exception:
                     pass
+                
+                if not dst.exists():
+                    logger.error(f"upload_file: copy succeeded but dst not found: {dst}")
+                    return None
                     
-                return f"/static/worker_media/{rel}"
-            except Exception:
-                logger.warning("R2 is not configured. Skipping upload.")
+                url = f"/static/worker_media/{rel}"
+                logger.info(f"Local upload OK: {url} ({dst.stat().st_size} bytes)")
+                return url
+            except Exception as e:
+                logger.error(f"Local upload failed for {file_path}: {e}", exc_info=True)
                 return None
 
         if object_name is None:

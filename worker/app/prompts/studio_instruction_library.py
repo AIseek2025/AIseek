@@ -10,7 +10,7 @@ STUDIO_INSTRUCTION_LIBRARY_CN = (
     "- calm=沉稳男声；energetic=热情女声；news=新闻播报男声；story=故事叙述女声；friendly=亲和口语女声；mature_male=成熟低沉男声；clear_female=清脆清晰女声；en_female/en_male=英文。\n"
     "4) BGM氛围（bgm_mood）：hot/upbeat/chill/tech/cinematic/serious/lofi/ambient/piano/acoustic/hiphop/edm/synthwave/orchestral/corporate/jazz/rock/none。\n"
     "5) 字幕（subtitle_mode）：zh/en/both/off。\n"
-    "6) 封面比例（cover_orientation）：portrait/landscape/square。\n"
+    "6) 封面比例（cover_orientation）：portrait/landscape。\n"
     "7) 最长时长（requested_duration_sec）：用户可给“最多90秒/2分钟/不超过xx”。\n"
     "8) 附加指令：任何“补充要求/追加要求”都应合并进 custom_instructions。\n"
     "\n"
@@ -23,4 +23,3 @@ STUDIO_INSTRUCTION_LIBRARY_CN = (
     "【创作建议（当用户询问或内容明显薄弱时主动补全）】\n"
     "- 先给爆点（痛点/反差/数字），再给结构（3-6段分镜），结尾给行动建议；口播短句、信息密度高、避免空话。\n"
 )
-

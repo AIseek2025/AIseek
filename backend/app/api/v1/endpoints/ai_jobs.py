@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 import uuid
@@ -17,7 +17,7 @@ from starlette.responses import StreamingResponse
 
 from app.api.deps import get_db, get_read_db
 from app.core.cache import cache
-from app.models.all_models import AIJob, Post, User, AIModerationCheck, AIJobMessage, AIJobDraftVersion, UserPersona
+from app.models.all_models import AIJob, Post, User, AIModerationCheck, AIJobMessage, AIJobDraftVersion, UserPersona, MediaAsset
 from app.api.v1.endpoints.users import get_current_user
 
 
@@ -56,6 +56,178 @@ def _auth_user_id(authorization: Optional[str], db: Session) -> Optional[int]:
     return int(getattr(u, "id"))
 
 
+def _tight_line(s: str, max_len: int) -> str:
+    t = re.sub(r"\s+", " ", str(s or "").strip())
+    if not t:
+        return ""
+    if len(t) <= int(max_len):
+        return t
+    parts = re.split(r"[，。！？；,.!?;:：]\s*", t)
+    out = ""
+    for p in parts:
+        p = str(p or "").strip()
+        if not p:
+            continue
+        cand = (out + ("，" if out else "") + p).strip()
+        if len(cand) <= int(max_len):
+            out = cand
+        else:
+            if not out:
+                out = p[: int(max_len)]
+            break
+    if not out:
+        out = t[: int(max_len)]
+    return out.strip("，。！？；：,.!?;:")
+
+
+def _sanitize_rerun_draft(draft_json: Any) -> Any:
+    if not isinstance(draft_json, dict):
+        return draft_json
+    out = dict(draft_json)
+    scenes = out.get("scenes") if isinstance(out.get("scenes"), list) else []
+    fixed = []
+    for s in scenes:
+        if not isinstance(s, dict):
+            continue
+        s2 = dict(s)
+        nar = _tight_line(str(s2.get("narration") or ""), 58)
+        sub = _tight_line(str(s2.get("subtitle") or ""), 22)
+        if not sub:
+            sub = _tight_line(nar, 22)
+        s2["narration"] = nar
+        s2["subtitle"] = sub
+        fixed.append(s2)
+    if fixed:
+        out["scenes"] = fixed
+    cov = out.get("cover") if isinstance(out.get("cover"), dict) else None
+    if isinstance(cov, dict):
+        c2 = dict(cov)
+        c2["title_text"] = _tight_line(str(c2.get("title_text") or ""), 18)
+        c2["subtitle_text"] = _tight_line(str(c2.get("subtitle_text") or ""), 24)
+        out["cover"] = c2
+    return out
+
+
+def _is_usable_draft(draft_json: Any) -> bool:
+    if not isinstance(draft_json, dict):
+        return False
+    scenes = draft_json.get("scenes")
+    if not isinstance(scenes, list) or not scenes:
+        return False
+    ok = 0
+    for s in scenes:
+        if not isinstance(s, dict):
+            continue
+        nar = str(s.get("narration") or "").strip()
+        sub = str(s.get("subtitle") or "").strip()
+        if nar or sub:
+            ok += 1
+    return ok > 0
+
+
+def _latest_draft_from_versions(db: Session, job_id: str) -> Optional[dict]:
+    try:
+        row = (
+            db.query(AIJobDraftVersion)
+            .filter(AIJobDraftVersion.job_id == str(job_id))
+            .order_by(AIJobDraftVersion.id.desc())
+            .first()
+        )
+        dj = getattr(row, "draft_json", None) if row else None
+        return dj if isinstance(dj, dict) else None
+    except Exception:
+        return None
+
+
+def _split_lines_for_fallback(content: str, max_len: int = 56, max_items: int = 8) -> list[str]:
+    txt = re.sub(r"\s+", " ", str(content or "").strip())
+    if not txt:
+        return []
+    parts = [p.strip() for p in re.split(r"[。！？!?；;]\s*", txt) if p and p.strip()]
+    out: list[str] = []
+    for p in parts:
+        p2 = _tight_line(p, max_len)
+        if p2:
+            out.append(p2)
+        if len(out) >= int(max_items):
+            break
+    if not out:
+        raw = txt[: int(max_len * max_items)]
+        for i in range(0, len(raw), max_len):
+            seg = raw[i : i + max_len].strip()
+            if seg:
+                out.append(seg)
+            if len(out) >= int(max_items):
+                break
+    return out
+
+
+def _build_fallback_draft(content: str, title: str = "") -> dict:
+    lines = _split_lines_for_fallback(content, 56, 8)
+    if not lines:
+        lines = ["本条内容生成中，请稍后重试。"]
+    scenes = []
+    for i, ln in enumerate(lines, start=1):
+        nar = _tight_line(ln, 58)
+        sub = _tight_line(ln, 22) or _tight_line(nar, 22)
+        scenes.append(
+            {
+                "idx": int(i),
+                "duration_sec": 6,
+                "narration": nar,
+                "subtitle": sub,
+                "visual_prompt_en": "clean abstract background, cinematic lighting",
+                "shot": "medium",
+                "transition": "cut",
+            }
+        )
+    t = _tight_line(str(title or "").strip(), 18) or _tight_line(lines[0], 18)
+    return {
+        "scenes": scenes,
+        "cover": {
+            "visual_prompt_en": "abstract tech background, minimal, high contrast",
+            "title_text": t,
+            "subtitle_text": "",
+        },
+    }
+
+
+def _resolve_best_script_for_job(db: Session, job: AIJob, post: Optional[Post] = None) -> dict:
+    res = getattr(job, "result_json", None)
+    ps = (res or {}).get("production_script") if isinstance(res, dict) else None
+    if not _is_usable_draft(ps):
+        dj = getattr(job, "draft_json", None)
+        if _is_usable_draft(dj):
+            ps = dj
+    if not _is_usable_draft(ps):
+        vj = _latest_draft_from_versions(db, str(getattr(job, "id", "") or ""))
+        if _is_usable_draft(vj):
+            ps = vj
+    if not _is_usable_draft(ps):
+        p = post
+        if p is None:
+            try:
+                p = db.query(Post).filter(Post.id == int(getattr(job, "post_id", 0) or 0)).first()
+            except Exception:
+                p = None
+        content = str((getattr(job, "input_json", {}) or {}).get("content") or (getattr(p, "content_text", "") if p else "") or "")
+        title = str(getattr(p, "title", "") if p else "")
+        ps = _build_fallback_draft(content, title)
+    ps = _sanitize_rerun_draft(ps if isinstance(ps, dict) else {})
+    if not isinstance(ps.get("cover"), dict):
+        title = ""
+        try:
+            title = str(getattr(post, "title", "") or "")
+        except Exception:
+            title = ""
+        ps["cover"] = {
+            "visual_prompt_en": "abstract tech background, minimal, high contrast",
+            "title_text": _tight_line(title, 18) if title else "",
+            "subtitle_text": "",
+        }
+    return ps if isinstance(ps, dict) else {}
+
+
 def _queued_pressure(db: Session) -> int:
     try:
         key = "cnt:ai_jobs:queued"
@@ -71,6 +243,107 @@ def _queued_pressure(db: Session) -> int:
             return max(0, int(db.query(AIJob).filter(AIJob.status == "queued").count()))
         except Exception:
             return 0
+
+
+def _dispatch_gate_state() -> tuple[bool, str]:
+    try:
+        from app.observability.runtime_ai_production import read_runtime_ai_production
+
+        cfg = read_runtime_ai_production()
+        hold = bool((cfg or {}).get("dispatch_hold_enabled", False))
+        reason = str((cfg or {}).get("dispatch_hold_reason", "manual_hold") or "manual_hold").strip()[:120] or "manual_hold"
+        return hold, reason
+    except Exception:
+        return False, "manual_hold"
+
+
+def _apply_dispatch_gate(job: AIJob, queue_message: str = "等待派发") -> dict:
+    hold, reason = _dispatch_gate_state()
+    if hold:
+        job.stage = "dispatch_hold"
+        job.stage_message = f"派发暂停：{reason}"
+        job.next_dispatch_at = None
+        return {"stage": "dispatch_hold", "event": "dispatch_hold", "extra": {"reason": reason}}
+    job.stage = "dispatch_pending"
+    job.stage_message = str(queue_message or "等待派发")
+    job.next_dispatch_at = datetime.now()
+    return {"stage": "dispatch_pending", "event": "dispatch_pending", "extra": {}}
+
+
+def _extract_observability(job: AIJob) -> dict:
+    out = {
+        "cover_metrics": None,
+        "cover_audit": None,
+        "placeholder_audit": None,
+        "analysis_audit": None,
+        "subtitle_audit": None,
+        "generation_quality": None,
+        "placeholder_trace_len": 0,
+        "cover_trace_len": 0,
+    }
+    try:
+        res = getattr(job, "result_json", None)
+        if not isinstance(res, dict):
+            return out
+        ph = res.get("placeholder") if isinstance(res.get("placeholder"), dict) else {}
+        cv = res.get("cover") if isinstance(res.get("cover"), dict) else {}
+        an = res.get("analysis") if isinstance(res.get("analysis"), dict) else {}
+        sb = res.get("subtitle") if isinstance(res.get("subtitle"), dict) else {}
+        qv = res.get("quality") if isinstance(res.get("quality"), dict) else {}
+        if isinstance(ph.get("audit"), dict):
+            out["placeholder_audit"] = ph.get("audit")
+        if isinstance(cv.get("audit"), dict):
+            out["cover_audit"] = cv.get("audit")
+        if isinstance(an.get("audit"), dict):
+            out["analysis_audit"] = an.get("audit")
+        if isinstance(sb.get("audit"), dict):
+            out["subtitle_audit"] = sb.get("audit")
+        if isinstance(qv.get("generation"), dict):
+            out["generation_quality"] = qv.get("generation")
+        if isinstance(cv.get("metrics"), dict):
+            out["cover_metrics"] = cv.get("metrics")
+        if isinstance(ph.get("trace"), list):
+            out["placeholder_trace_len"] = len(ph.get("trace"))
+        if isinstance(cv.get("trace"), list):
+            out["cover_trace_len"] = len(cv.get("trace"))
+    except Exception:
+        return out
+    return out
+
+
+def _enrich_observability_from_media(db: Session, job: AIJob, obs: dict) -> dict:
+    out = dict(obs or {})
+    if isinstance(out.get("subtitle_audit"), dict) and isinstance(out.get("generation_quality"), dict):
+        return out
+    try:
+        pid = int(getattr(job, "post_id", 0) or 0)
+    except Exception:
+        pid = 0
+    if pid <= 0:
+        return out
+    try:
+        m = (
+            db.query(MediaAsset)
+            .filter(MediaAsset.post_id == int(pid))
+            .order_by(MediaAsset.id.desc())
+            .first()
+        )
+    except Exception:
+        m = None
+    tracks = getattr(m, "subtitle_tracks", None) if m else None
+    if not tracks:
+        return out
+    try:
+        from app.api.v1.endpoints.posts import _infer_subtitle_quality_from_tracks
+
+        sb, gq = _infer_subtitle_quality_from_tracks(tracks)
+    except Exception:
+        sb, gq = None, None
+    if not isinstance(out.get("subtitle_audit"), dict) and isinstance(sb, dict):
+        out["subtitle_audit"] = sb
+    if not isinstance(out.get("generation_quality"), dict) and isinstance(gq, dict):
+        out["generation_quality"] = gq
+    return out
 
 def _acquire_job_lock(job_id: str, kind: str, ttl: int) -> bool:
     jid = str(job_id or "").strip()
@@ -242,6 +515,7 @@ async def stream_job_events(
         nonlocal last
         yield "event: hello\ndata: {}\n\n"
         try:
+            obs = _enrich_observability_from_media(db, job, _extract_observability(job))
             snap = {
                 "id": int(last or 0),
                 "ts": int(time.time()),
@@ -251,6 +525,12 @@ async def stream_job_events(
                     "progress": int(getattr(job, "progress", 0) or 0),
                     "stage": getattr(job, "stage", None),
                     "stage_message": getattr(job, "stage_message", None),
+                    "cover_metrics": obs.get("cover_metrics"),
+                    "analysis_audit": obs.get("analysis_audit"),
+                    "subtitle_audit": obs.get("subtitle_audit"),
+                    "generation_quality": obs.get("generation_quality"),
+                    "cover_trace_len": int(obs.get("cover_trace_len") or 0),
+                    "placeholder_trace_len": int(obs.get("placeholder_trace_len") or 0),
                 },
             }
             data = json.dumps(snap, ensure_ascii=False, separators=(",", ":"))
@@ -344,6 +624,13 @@ class SubmitIn(BaseModel):
     subtitle_mode: Optional[str] = None
     requested_duration_sec: Optional[int] = None
     cover_orientation: Optional[str] = None
+
+
+def _norm_cover_orientation(v: Any) -> str:
+    s = str(v or "").strip().lower()
+    if s == "landscape":
+        return "landscape"
+    return "portrait"
 
 
 def _norm_tags(raw: Optional[str], limit: int = 6) -> List[str]:
@@ -583,12 +870,24 @@ def chat_ai_suggest(job_id: str, body: ReviseFromChatIn, authorization: Optional
 
 
 @router.get("/jobs/{job_id}")
-def get_job(job_id: str, user_id: Optional[int] = None, db: Session = Depends(get_read_db)):
+def get_job(job_id: str, user_id: Optional[int] = None, response: Response = None, db: Session = Depends(get_read_db)):
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     job = db.query(AIJob).filter(AIJob.id == str(job_id)).first()
     if not job:
         raise HTTPException(status_code=404, detail="not_found")
-    if user_id is not None and int(user_id) != int(job.user_id):
-        raise HTTPException(status_code=403, detail="forbidden")
+    obs = _enrich_observability_from_media(db, job, _extract_observability(job))
+    res = getattr(job, "result_json", None)
+    if not isinstance(res, dict):
+        res = {}
+    p = db.query(Post).filter(Post.id == int(getattr(job, "post_id", 0) or 0)).first()
+    ps = _resolve_best_script_for_job(db, job, p)
+    if isinstance(ps, dict) and ps:
+        res2 = dict(res)
+        res2["production_script"] = ps
+        res = res2
     return {
         "id": str(job.id),
         "user_id": int(job.user_id),
@@ -605,16 +904,42 @@ def get_job(job_id: str, user_id: Optional[int] = None, db: Session = Depends(ge
         "created_at": getattr(job, "created_at", None),
         "updated_at": getattr(job, "updated_at", None),
         "cancelled_at": getattr(job, "cancelled_at", None),
+        "cover_metrics": obs.get("cover_metrics"),
+        "cover_audit": obs.get("cover_audit"),
+        "placeholder_audit": obs.get("placeholder_audit"),
+        "analysis_audit": obs.get("analysis_audit"),
+        "subtitle_audit": obs.get("subtitle_audit"),
+        "generation_quality": obs.get("generation_quality"),
+        "cover_trace_len": int(obs.get("cover_trace_len") or 0),
+        "placeholder_trace_len": int(obs.get("placeholder_trace_len") or 0),
+        "result_json": res if isinstance(res, dict) else None,
+        "production_script": ps if isinstance(ps, dict) else None,
     }
 
 
 @router.get("/jobs/by_post/{post_id}")
-def get_job_by_post(post_id: int, user_id: Optional[int] = None, db: Session = Depends(get_read_db)):
-    job = db.query(AIJob).filter(AIJob.post_id == int(post_id)).order_by(AIJob.created_at.desc()).first()
+def get_job_by_post(post_id: int, user_id: Optional[int] = None, response: Response = None, db: Session = Depends(get_read_db)):
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    rows = (
+        db.query(AIJob)
+        .filter(AIJob.post_id == int(post_id))
+        .order_by(AIJob.created_at.desc())
+        .limit(30)
+        .all()
+    )
+    job = rows[0] if rows else None
+    if rows:
+        for r in rows:
+            if str(getattr(r, "status", "") or "") == "done":
+                ps = _resolve_best_script_for_job(db, r)
+                if _is_usable_draft(ps):
+                    job = r
+                    break
     if not job:
         return {"job_id": None}
-    if user_id is not None and int(user_id) != int(job.user_id):
-        raise HTTPException(status_code=403, detail="forbidden")
     return {"job_id": str(job.id)}
 
 
@@ -675,12 +1000,11 @@ def redispatch_job(job_id: str, body: DispatchIn, authorization: Optional[str] =
         raise HTTPException(status_code=404, detail="post_not_found")
 
     try:
+        gate = {"stage": "dispatch_pending", "event": "dispatch_pending", "extra": {}}
         job.status = "queued"
-        job.stage = "dispatch_pending"
-        job.stage_message = "等待派发"
+        gate = _apply_dispatch_gate(job, "等待派发")
         job.error = None
         job.worker_task_id = None
-        job.next_dispatch_at = datetime.now()
         post.status = "queued"
         db.commit()
     except Exception:
@@ -691,10 +1015,10 @@ def redispatch_job(job_id: str, body: DispatchIn, authorization: Optional[str] =
         raise HTTPException(status_code=400, detail="update_failed")
 
     try:
-        _append_job_event(str(job.id), "dispatch_pending", {"post_id": int(post.id), "kind": getattr(job, "kind", None)})
+        _append_job_event(str(job.id), str(gate.get("event") or "dispatch_pending"), {"post_id": int(post.id), "kind": getattr(job, "kind", None), **(gate.get("extra") or {})})
     except Exception:
         pass
-    return {"ok": True, "job_id": str(job.id), "post_id": int(post.id), "stage": "dispatch_pending"}
+    return {"ok": True, "job_id": str(job.id), "post_id": int(post.id), "stage": str(gate.get("stage") or "dispatch_pending")}
 
 
 @router.get("/jobs/{job_id}/cancelled")
@@ -717,9 +1041,17 @@ def get_draft(job_id: str, user_id: Optional[int] = None, authorization: Optiona
     au = _auth_user_id(authorization, db)
     if au is not None:
         user_id = au
-    if user_id is not None and int(user_id) != int(job.user_id):
+    if au is not None and int(user_id or 0) != int(job.user_id):
         raise HTTPException(status_code=403, detail="forbidden")
-    return {"draft_json": getattr(job, "draft_json", None)}
+    draft = getattr(job, "draft_json", None)
+    if not _is_usable_draft(draft):
+        draft = _latest_draft_from_versions(db, str(job_id))
+    if not _is_usable_draft(draft):
+        p = db.query(Post).filter(Post.id == int(getattr(job, "post_id", 0) or 0)).first()
+        content = str((getattr(job, "input_json", {}) or {}).get("content") or (getattr(p, "content_text", "") if p else "") or "")
+        title = str(getattr(p, "title", "") if p else "")
+        draft = _build_fallback_draft(content, title)
+    return {"draft_json": draft if isinstance(draft, dict) else None}
 
 
 @router.get("/jobs/{job_id}/review")
@@ -937,12 +1269,12 @@ def post_chat(job_id: str, body: ChatIn, authorization: Optional[str] = Header(N
                     db.add(job2)
                     post.ai_job_id = new_job_id
                     post.status = "queued"
-                    job2.stage = "dispatch_pending"
-                    job2.stage_message = "等待派发"
-                    job2.next_dispatch_at = datetime.now()
+                    gate = _apply_dispatch_gate(job2, "等待派发")
+                    job2.error = None
+                    job2.worker_task_id = None
                     db.commit()
                     try:
-                        _append_job_event(str(new_job_id), "dispatch_pending", {"post_id": int(post.id), "kind": "generate_video"})
+                        _append_job_event(str(new_job_id), str(gate.get("event") or "dispatch_pending"), {"post_id": int(post.id), "kind": "generate_video", **(gate.get("extra") or {})})
                         _append_job_event(str(new_job_id), "rerun", {"base_job_id": str(job_id), "post_id": int(post.id)})
                     except Exception:
                         pass
@@ -1124,8 +1456,13 @@ def rerun_from_draft(job_id: str, body: RerunIn, authorization: Optional[str] = 
         raise HTTPException(status_code=404, detail="post_not_found")
 
     draft = body.draft_json if body.draft_json is not None else getattr(base, "draft_json", None)
-    if draft is None:
-        raise HTTPException(status_code=400, detail="missing_draft")
+    if not _is_usable_draft(draft):
+        draft = _latest_draft_from_versions(db, str(job_id))
+    if not _is_usable_draft(draft):
+        draft = _build_fallback_draft(content, str(getattr(post, "title", "") or ""))
+    draft = _sanitize_rerun_draft(draft)
+    if not _is_usable_draft(draft):
+        draft = _build_fallback_draft(content, str(getattr(post, "title", "") or ""))
 
     base_input = base.input_json if isinstance(getattr(base, "input_json", None), dict) else {}
     content = str((base_input or {}).get("content") or post.content_text or "")
@@ -1163,14 +1500,12 @@ def rerun_from_draft(job_id: str, body: RerunIn, authorization: Optional[str] = 
     db.commit()
 
     try:
-        job.stage = "dispatch_pending"
-        job.stage_message = "等待派发"
+        gate = _apply_dispatch_gate(job, "等待派发")
         job.error = None
         job.worker_task_id = None
-        job.next_dispatch_at = datetime.now()
         db.commit()
         try:
-            _append_job_event(str(new_job_id), "dispatch_pending", {"post_id": int(post.id), "kind": "generate_video"})
+            _append_job_event(str(new_job_id), str(gate.get("event") or "dispatch_pending"), {"post_id": int(post.id), "kind": "generate_video", **(gate.get("extra") or {})})
         except Exception:
             pass
     except Exception:
@@ -1341,7 +1676,7 @@ def submit_ai(body: SubmitIn, authorization: Optional[str] = Header(None), db: S
             "bgm_id": body.bgm_id,
             "subtitle_mode": body.subtitle_mode,
             "requested_duration_sec": pf.get("requested_duration_sec"),
-            "cover_orientation": body.cover_orientation,
+            "cover_orientation": _norm_cover_orientation(body.cover_orientation),
             "title": raw_title or None,
             "tags": tags,
             "preflight": {
@@ -1361,14 +1696,12 @@ def submit_ai(body: SubmitIn, authorization: Optional[str] = Header(None), db: S
         pass
 
     try:
-        job.stage = "dispatch_pending"
-        job.stage_message = "等待派发"
+        gate = _apply_dispatch_gate(job, "等待派发")
         job.error = None
         job.worker_task_id = None
-        job.next_dispatch_at = datetime.now()
         db.commit()
         try:
-            _append_job_event(str(job_id), "dispatch_pending", {"post_id": int(post.id), "kind": "generate_video"})
+            _append_job_event(str(job_id), str(gate.get("event") or "dispatch_pending"), {"post_id": int(post.id), "kind": "generate_video", **(gate.get("extra") or {})})
         except Exception:
             pass
     except Exception:
@@ -1472,13 +1805,11 @@ def resubmit_returned_post(post_id: int, body: SubmitIn, authorization: Optional
     db.add(job)
     db.commit()
     try:
-        job.stage = "dispatch_pending"
-        job.stage_message = "等待派发"
+        gate = _apply_dispatch_gate(job, "等待派发")
         job.error = None
         job.worker_task_id = None
-        job.next_dispatch_at = datetime.now()
         db.commit()
-        _append_job_event(str(new_job_id), "dispatch_pending", {"post_id": int(post.id), "kind": "generate_video"})
+        _append_job_event(str(new_job_id), str(gate.get("event") or "dispatch_pending"), {"post_id": int(post.id), "kind": "generate_video", **(gate.get("extra") or {})})
     except Exception:
         try:
             db.rollback()
@@ -1528,9 +1859,9 @@ def regen_cover(post_id: int, body: RegenCoverIn, authorization: Optional[str] =
     try:
         job = db.query(AIJob).filter(AIJob.id == str(job_id)).first()
         inp = job.input_json if job and isinstance(getattr(job, "input_json", None), dict) else {}
-        cover_orientation = inp.get("cover_orientation")
+        cover_orientation = _norm_cover_orientation(inp.get("cover_orientation"))
     except Exception:
-        cover_orientation = None
+        cover_orientation = "portrait"
 
     tid = send_worker_task(
         "generate_cover_only",
@@ -1621,14 +1952,12 @@ def revise_job(job_id: str, body: ReviseIn, db: Session = Depends(get_db)):
         pass
 
     try:
-        job.stage = "dispatch_pending"
-        job.stage_message = "等待派发"
+        gate = _apply_dispatch_gate(job, "等待派发")
         job.error = None
         job.worker_task_id = None
-        job.next_dispatch_at = datetime.now()
         db.commit()
         try:
-            _append_job_event(str(new_job_id), "dispatch_pending", {"post_id": int(post.id), "kind": "generate_video"})
+            _append_job_event(str(new_job_id), str(gate.get("event") or "dispatch_pending"), {"post_id": int(post.id), "kind": "generate_video", **(gate.get("extra") or {})})
         except Exception:
             pass
     except Exception:
@@ -1719,14 +2048,12 @@ def revise_from_chat(job_id: str, body: ReviseFromChatIn, authorization: Optiona
             pass
 
     try:
-        job.stage = "dispatch_pending"
-        job.stage_message = "等待派发"
+        gate = _apply_dispatch_gate(job, "等待派发")
         job.error = None
         job.worker_task_id = None
-        job.next_dispatch_at = datetime.now()
         db.commit()
         try:
-            _append_job_event(str(new_job_id), "dispatch_pending", {"post_id": int(post.id), "kind": "generate_video"})
+            _append_job_event(str(new_job_id), str(gate.get("event") or "dispatch_pending"), {"post_id": int(post.id), "kind": "generate_video", **(gate.get("extra") or {})})
         except Exception:
             pass
     except Exception:
@@ -1841,6 +2168,55 @@ def admin_cancel_job(
         except Exception:
             pass
     return {"ok": True, "status": "cancelled"}
+
+
+@router.post("/admin/jobs/{job_id}/release-hold")
+def admin_release_hold_job(
+    job_id: str,
+    authorization: str = Header(None),
+    db: Session = Depends(get_db),
+):
+    from app.api.v1.endpoints.users import get_current_user
+
+    u = get_current_user(authorization=authorization, db=db)
+    if not getattr(u, "is_superuser", False):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    job = db.query(AIJob).filter(AIJob.id == str(job_id)).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="not_found")
+
+    if str(getattr(job, "status", "") or "") != "queued":
+        return {"ok": True, "action": "noop", "reason": "status_not_queued", "status": str(getattr(job, "status", "") or "")}
+    if str(getattr(job, "stage", "") or "") != "dispatch_hold":
+        return {"ok": True, "action": "noop", "reason": "stage_not_dispatch_hold", "stage": str(getattr(job, "stage", "") or "")}
+
+    hold_enabled, hold_reason = _dispatch_gate_state()
+    try:
+        job.stage = "dispatch_pending"
+        job.stage_message = "等待派发"
+        job.next_dispatch_at = datetime.now()
+        db.commit()
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail="release_failed")
+
+    try:
+        _append_job_event(str(job.id), "dispatch_released", {"by": int(getattr(u, "id", 0) or 0), "admin": True, "hold_enabled": bool(hold_enabled), "hold_reason": hold_reason})
+        _append_job_event(str(job.id), "dispatch_pending", {"post_id": int(getattr(job, "post_id", 0) or 0), "kind": getattr(job, "kind", None), "released": True})
+    except Exception:
+        pass
+    return {
+        "ok": True,
+        "action": "released",
+        "job_id": str(job.id),
+        "stage": "dispatch_pending",
+        "hold_enabled": bool(hold_enabled),
+        "hold_reason": str(hold_reason),
+    }
 
 
 @router.post("/jobs/{job_id}/appeal")
@@ -1977,7 +2353,7 @@ def _dispatch_generate(job: AIJob, post: Post) -> None:
             "bgm_id": inp.get("bgm_id"),
             "subtitle_mode": sm,
             "requested_duration_sec": inp.get("requested_duration_sec"),
-            "cover_orientation": inp.get("cover_orientation"),
+            "cover_orientation": _norm_cover_orientation(inp.get("cover_orientation")),
             "target_sec": pf.get("target_sec"),
             "post_id": int(post.id),
             "draft_json": getattr(job, "draft_json", None),
@@ -2028,11 +2404,9 @@ def admin_review_decide(
     if act == "approve":
         try:
             job.status = "queued"
-            job.stage = "dispatch_pending"
-            job.stage_message = "审核通过，等待派发"
+            gate = _apply_dispatch_gate(job, "审核通过，等待派发")
             job.error = None
             job.worker_task_id = None
-            job.next_dispatch_at = datetime.now()
             post.status = "queued"
             post.error_message = None
             db.commit()
@@ -2043,7 +2417,7 @@ def admin_review_decide(
                 pass
         try:
             _append_job_event(str(job.id), "review_approved", {"by": int(getattr(current_user, "id", 0) or 0)})
-            _append_job_event(str(job.id), "dispatch_pending", {"post_id": int(post.id), "kind": "generate_video"})
+            _append_job_event(str(job.id), str(gate.get("event") or "dispatch_pending"), {"post_id": int(post.id), "kind": "generate_video", **(gate.get("extra") or {})})
         except Exception:
             pass
     else:

@@ -19,7 +19,7 @@ from app.core.logging_config import configure_logging
 from app.core.migrations import run_migrations
 from app.core.tracing import configure_tracing
 from app.db.session import SessionLocal, SessionLocalRead
-from app.models.all_models import Category, User
+from app.models.all_models import Category, User, AIJob, Post
 from app.middleware.metrics import MetricsMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.canary import CanaryMiddleware
@@ -35,6 +35,7 @@ def create_app() -> FastAPI:
     configure_logging()
     app = FastAPI(title=settings.PROJECT_NAME, openapi_url="/api/v1/openapi.json")
     build_id = os.getenv("AISEEK_BUILD_ID") or time.strftime("%Y-%m-%d.%H%M%S")
+    instance_id = os.getenv("AISEEK_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
     from app.core.assets import ensure_rollout_cookie, make_asset_url_for_request
 
     try:
@@ -553,7 +554,9 @@ def create_app() -> FastAPI:
         elif path.startswith("/static/uploads/") or path.startswith("/static/worker_media/"):
             response.headers["Cache-Control"] = "public, max-age=3600"
         elif path.startswith("/static/js/") or path.startswith("/static/css/"):
-            response.headers["Cache-Control"] = "public, max-age=0"
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         elif path.startswith("/static/"):
             response.headers["Cache-Control"] = "public, max-age=86400"
         if path.startswith("/api/v1/") and request.method.upper() in {"POST", "PUT", "DELETE"}:
@@ -568,7 +571,24 @@ def create_app() -> FastAPI:
                     )
             except Exception:
                 pass
+        if path in {"/", "/studio"}:
+            try:
+                sid = request.cookies.get("aiseek_sid")
+            except Exception:
+                sid = None
+            try:
+                sid2 = ensure_rollout_cookie(sid)
+                cookies = dict(request.cookies or {})
+                cookies["aiseek_sid"] = sid2
+                au = make_asset_url_for_request(build_id, cookies, request.headers)
+                response.headers["x-chain-main-js"] = str(au("js/main.js") or "")
+                response.headers["x-chain-studio-js"] = str(au("js/app/studio.js") or "")
+                response.headers["x-chain-profile-js"] = str(au("js/app/profile.js") or "")
+                response.headers["x-chain-actions-js"] = f"/static/js/modules/actions.js?v={build_id}"
+            except Exception:
+                pass
         response.headers["x-aiseek-build"] = build_id
+        response.headers["x-aiseek-instance"] = str(instance_id)
         try:
             if "x-request-id" not in response.headers:
                 from app.core.request_context import get_request_id
@@ -752,6 +772,197 @@ def create_app() -> FastAPI:
             result["errors"].append(f"Failed to read logs: {str(e)}")
             
         return result
+
+    @app.get("/api/v1/debug/chain-status")
+    def debug_chain_status(request: Request):
+        out = {
+            "build_id": str(build_id),
+            "instance_id": str(instance_id),
+            "request_path": str(getattr(request.url, "path", "") or ""),
+            "request_host": str(request.headers.get("host", "") or ""),
+            "request_origin": str(request.headers.get("origin", "") or ""),
+            "request_forwarded_host": str(request.headers.get("x-forwarded-host", "") or ""),
+            "assets": {},
+            "latest": {},
+            "probe": {},
+            "ok": True,
+        }
+        try:
+            qp = request.query_params
+            ptxt = str(qp.get("post_id", "") or "").strip()
+            post_probe = int(ptxt) if ptxt and ptxt.isdigit() else 78
+        except Exception:
+            post_probe = 78
+        try:
+            sid = None
+            try:
+                sid = request.cookies.get("aiseek_sid")
+            except Exception:
+                sid = None
+            sid2 = ensure_rollout_cookie(sid)
+            cookies = dict(request.cookies or {})
+            cookies["aiseek_sid"] = sid2
+            asset_url = make_asset_url_for_request(build_id, cookies, request.headers)
+            out["assets"] = {
+                "main_js": str(asset_url("js/main.js") or ""),
+                "studio_js": str(asset_url("js/app/studio.js") or ""),
+                "profile_js": str(asset_url("js/app/profile.js") or ""),
+                "helpers_js": str(asset_url("js/app/helpers.js") or ""),
+                "actions_js": f"/static/js/modules/actions.js?v={build_id}",
+            }
+        except Exception as e:
+            out["ok"] = False
+            out["assets_error"] = str(e)
+        db = None
+        try:
+            db = SessionLocalRead()
+            job = db.query(AIJob).order_by(AIJob.created_at.desc()).first()
+            if job:
+                post = db.query(Post).filter(Post.id == int(getattr(job, "post_id", 0) or 0)).first()
+                draft = getattr(job, "draft_json", None)
+                result = getattr(job, "result_json", None)
+                ps = (result or {}).get("production_script") if isinstance(result, dict) else None
+                out["latest"] = {
+                    "job_id": str(getattr(job, "id", "") or ""),
+                    "status": str(getattr(job, "status", "") or ""),
+                    "stage": str(getattr(job, "stage", "") or ""),
+                    "post_id": int(getattr(job, "post_id", 0) or 0),
+                    "post_status": str(getattr(post, "status", "") or "") if post else "",
+                    "post_ai_job_id": str(getattr(post, "ai_job_id", "") or "") if post else "",
+                    "draft_scenes": len((draft or {}).get("scenes") or []) if isinstance(draft, dict) else 0,
+                    "result_scenes": len((ps or {}).get("scenes") or []) if isinstance(ps, dict) else 0,
+                    "has_cover": bool(isinstance(ps, dict) and isinstance((ps or {}).get("cover"), dict)),
+                }
+            try:
+                p = db.query(Post).filter(Post.id == int(post_probe)).first()
+                if p:
+                    j = (
+                        db.query(AIJob)
+                        .filter(AIJob.post_id == int(post_probe))
+                        .order_by(AIJob.created_at.desc())
+                        .first()
+                    )
+                    dj = getattr(j, "draft_json", None) if j else None
+                    rj = getattr(j, "result_json", None) if j else None
+                    ps2 = (rj or {}).get("production_script") if isinstance(rj, dict) else None
+                    out["probe"] = {
+                        "post_id": int(post_probe),
+                        "post_status": str(getattr(p, "status", "") or ""),
+                        "post_ai_job_id": str(getattr(p, "ai_job_id", "") or ""),
+                        "job_id": str(getattr(j, "id", "") or "") if j else "",
+                        "job_status": str(getattr(j, "status", "") or "") if j else "",
+                        "draft_scenes": len((dj or {}).get("scenes") or []) if isinstance(dj, dict) else 0,
+                        "result_scenes": len((ps2 or {}).get("scenes") or []) if isinstance(ps2, dict) else 0,
+                    }
+                else:
+                    out["probe"] = {"post_id": int(post_probe), "exists": False}
+            except Exception as e:
+                out["probe"] = {"post_id": int(post_probe), "error": str(e)}
+        except Exception as e:
+            out["ok"] = False
+            out["latest_error"] = str(e)
+        finally:
+            try:
+                if db:
+                    db.close()
+            except Exception:
+                pass
+        try:
+            from app.core.cache import cache
+            sid = str(request.cookies.get("aiseek_sid") or "").strip()
+            key = f"debug:client_probe:last:{sid}" if sid else "debug:client_probe:last"
+            cp = cache.get_json(key)
+            if not cp and sid:
+                cp = cache.get_json("debug:client_probe:last")
+            out["client_probe"] = cp if isinstance(cp, dict) else None
+            try:
+                ts = int((cp or {}).get("ts") or 0) if isinstance(cp, dict) else 0
+                out["client_probe_age_sec"] = int(time.time()) - ts if ts > 0 else None
+                age = out.get("client_probe_age_sec")
+                out["client_probe_fresh"] = bool(isinstance(age, int) and age <= 180)
+                out["client_probe_stale"] = bool(isinstance(age, int) and age > 180)
+            except Exception:
+                out["client_probe_age_sec"] = None
+                out["client_probe_fresh"] = False
+                out["client_probe_stale"] = False
+        except Exception:
+            out["client_probe"] = None
+            out["client_probe_age_sec"] = None
+            out["client_probe_fresh"] = False
+            out["client_probe_stale"] = False
+        return out
+
+    @app.post("/api/v1/debug/client-probe")
+    async def debug_client_probe(request: Request):
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        payload = body if isinstance(body, dict) else {}
+        out = {
+            "ts": int(time.time()),
+            "build_id": str(build_id),
+            "path": str(getattr(request.url, "path", "") or ""),
+            "ua": str(request.headers.get("user-agent", "") or "")[:280],
+            "remote": str(request.client.host if request.client else ""),
+            "probe": payload,
+        }
+        try:
+            from app.core.cache import cache
+            sid = str(request.cookies.get("aiseek_sid") or "").strip()
+            cache.set_json("debug:client_probe:last", out, ttl=86400)
+            if sid:
+                cache.set_json(f"debug:client_probe:last:{sid}", out, ttl=86400)
+        except Exception:
+            pass
+        return {"ok": True, "saved": True}
+
+    @app.get("/api/v1/debug/client-probe")
+    def debug_client_probe_get(request: Request):
+        try:
+            from app.core.cache import cache
+            sid = str(request.cookies.get("aiseek_sid") or "").strip()
+            key = f"debug:client_probe:last:{sid}" if sid else "debug:client_probe:last"
+            cp = cache.get_json(key)
+            if not cp and sid:
+                cp = cache.get_json("debug:client_probe:last")
+            return {"ok": True, "sid": sid, "last": cp if isinstance(cp, dict) else None}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @app.get("/api/v1/debug/client-probe/ping")
+    def debug_client_probe_ping(request: Request):
+        qp = request.query_params
+        out = {
+            "ts": int(time.time()),
+            "build_id": str(build_id),
+            "path": str(getattr(request.url, "path", "") or ""),
+            "ua": str(request.headers.get("user-agent", "") or "")[:280],
+            "remote": str(request.client.host if request.client else ""),
+            "probe": {
+                "page": str(qp.get("page", "") or "")[:32],
+                "build": str(qp.get("build", "") or "")[:64],
+                "entry": str(qp.get("entry", "") or "")[:280],
+                "href": str(qp.get("href", "") or "")[:300],
+                "sel_ok": str(qp.get("sel_ok", "") or "")[:8],
+                "sel_len": str(qp.get("sel_len", "") or "")[:16],
+                "probe_ps": str(qp.get("probe_ps", "") or "")[:16],
+                "probe_exist": str(qp.get("probe_exist", "") or "")[:8],
+                "actions_js": str(qp.get("actions_js", "") or "")[:200],
+                "pd_blocked": str(qp.get("pd_blocked", "") or "")[:8],
+                "md_blocked": str(qp.get("md_blocked", "") or "")[:8],
+                "ss_blocked": str(qp.get("ss_blocked", "") or "")[:8],
+            },
+        }
+        try:
+            from app.core.cache import cache
+            sid = str(request.cookies.get("aiseek_sid") or "").strip()
+            cache.set_json("debug:client_probe:last", out, ttl=86400)
+            if sid:
+                cache.set_json(f"debug:client_probe:last:{sid}", out, ttl=86400)
+        except Exception:
+            pass
+        return {"ok": True, "saved": True}
 
     @app.get("/api/v1/debug/fix_auth")
     def debug_fix_auth():
@@ -957,6 +1168,15 @@ def create_app() -> FastAPI:
     @app.api_route("/studio.html", methods=["GET", "HEAD"])
     def read_studio_html():
         return RedirectResponse(url="/studio", status_code=307)
+
+    @app.api_route("/s/{share_key}", methods=["GET", "HEAD"])
+    def read_search_share_short(share_key: str):
+        key = str(share_key or "").strip()
+        if not key:
+            return RedirectResponse(url="/", status_code=307)
+        if not all(ch.isalnum() or ch in "-_" for ch in key):
+            return RedirectResponse(url="/", status_code=307)
+        return RedirectResponse(url=f"/#/search?svk={key}", status_code=307)
 
     @app.api_route("/admin", methods=["GET", "HEAD"])
     def read_admin(request: Request):

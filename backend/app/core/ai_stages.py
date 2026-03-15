@@ -24,7 +24,7 @@ STAGE_RANK: Dict[str, int] = {
 }
 
 
-ALLOW_DRAFT_STAGES = {"deepseek", "draft_loaded", "chat_ai_done"}
+ALLOW_DRAFT_STAGES = {"deepseek", "draft_loaded", "chat_ai_done", "done"}
 ALLOW_ASSISTANT_MESSAGE_STAGES = {"chat_ai_done"}
 
 

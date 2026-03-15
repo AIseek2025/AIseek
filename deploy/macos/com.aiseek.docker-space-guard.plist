@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.aiseek.docker-space-guard</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/surferboy/.openclaw/workspace/AIseek-integrated/AIseek-Trae-v1/scripts/docker_space_guard.sh</string>
+    <string>/</string>
+    <string>70</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StartInterval</key>
+  <integer>21600</integer>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/surferboy/.openclaw/workspace/AIseek-integrated/AIseek-Trae-v1</string>
+
+  <key>StandardOutPath</key>
+  <string>/Users/surferboy/Library/Logs/aiseek-docker-space-guard.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/surferboy/Library/Logs/aiseek-docker-space-guard.err.log</string>
+</dict>
+</plist>

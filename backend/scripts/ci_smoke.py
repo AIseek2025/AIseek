@@ -116,16 +116,22 @@ def _write_outputs(report_path: str, summary_path: str, base: str, checks: list[
     _write_summary(summary_path, base, checks, exit_code)
 
 
-def _run_check(cmd: list[str], env: dict, timeout: int, name: str) -> tuple[int, str]:
+def _run_check(cmd: list[str], env: dict, timeout: int, name: str, cwd: str = None) -> tuple[int, str]:
+    import os
+    # Use project root as working directory if not specified
+    if cwd is None:
+        cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     p = subprocess.run(
         cmd,
         env=env,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.STDOUT,  # stderr already merged to stdout
         text=True,
         timeout=timeout,
+        cwd=cwd,
     )
-    return int(p.returncode), str(p.stdout or "")
+    output = str(p.stdout or "") + str(p.stderr or "")
+    return int(p.returncode), output
 
 
 def main() -> int:

@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from difflib import SequenceMatcher
 from app.core.config import settings, MAX_CONTENT_LENGTH
 from app.core.utils import retry_sync
 
@@ -22,7 +23,7 @@ class DeepSeekService:
         except Exception:
             self.client = None
 
-    def _fallback_video(self, content: str, custom_instructions: str = None) -> dict:
+    def _fallback_video(self, content: str, custom_instructions: str = None, degraded_reason: str = "fallback_video") -> dict:
         raw = str(content or "").strip()
         if not raw:
             raw = "请根据用户输入生成一条知识类短视频口播稿。"
@@ -35,12 +36,13 @@ class DeepSeekService:
             parts = [summary]
         scenes = []
         for i, p in enumerate(parts[:8], start=1):
+            nar = self._tight_line(p, max_len=58)
             scenes.append(
                 {
                     "idx": i,
                     "duration_sec": 6,
-                    "narration": p[:120],
-                    "subtitle": p[:120],
+                    "narration": nar,
+                    "subtitle": self._subtitle_from_narration(nar, max_len=22),
                     "visual_prompt_en": "clean abstract background, tech style, simple icons",
                     "shot": "medium",
                     "transition": "cut",
@@ -50,15 +52,111 @@ class DeepSeekService:
         return {
             "title": title,
             "summary": summary,
+            "_meta": {"degraded": True, "degraded_reason": str(degraded_reason or "fallback_video")},
             "production_script": {
                 "scenes": scenes,
                 "cover": {"visual_prompt_en": "abstract tech background, minimal", "title_text": title, "subtitle_text": ""},
                 "music": {"mood": "tech", "tags": ["ambient", "soft"]},
+                "_meta": {"degraded": True, "degraded_reason": str(degraded_reason or "fallback_video")},
             },
             "voice_text": voice_text,
             "subtitles": [{"text": s["subtitle"]} for s in scenes],
             "bgm_mood": "tech",
         }
+
+    def _nrm_cmp(self, s: str) -> str:
+        t = str(s or "").lower()
+        return re.sub(r"[\s，,。．.！!？?：:；;、】【\[\]（）()“”\"'‘’·`~@#$%^&*_+=|\\/<>-]", "", t)
+
+    def _sim(self, a: str, b: str) -> float:
+        aa = self._nrm_cmp(a)
+        bb = self._nrm_cmp(b)
+        if not aa or not bb:
+            return 0.0
+        try:
+            return float(SequenceMatcher(None, aa, bb).ratio())
+        except Exception:
+            return 0.0
+
+    def _tight_line(self, s: str, max_len: int = 58) -> str:
+        t = str(s or "").strip()
+        t = re.sub(r"\s+", " ", t).strip()
+        if not t:
+            return ""
+        if len(t) <= int(max_len):
+            return t
+        parts = re.split(r"[，。！？；,.!?;:：]\s*", t)
+        out = ""
+        for p in parts:
+            p = str(p or "").strip()
+            if not p:
+                continue
+            cand = (out + ("，" if out else "") + p).strip()
+            if len(cand) <= int(max_len):
+                out = cand
+            else:
+                if not out:
+                    out = p[: int(max_len)]
+                break
+        if not out:
+            out = t[: int(max_len)]
+        return out.strip("，。！？；：,.!?;:")
+
+    def _subtitle_from_narration(self, nar: str, max_len: int = 22) -> str:
+        n = self._tight_line(nar, max_len=max_len)
+        if not n:
+            return ""
+        n = n.strip("，。！？；：,.!?;:")
+        if len(n) <= int(max_len):
+            return n
+        return n[: int(max_len)].strip()
+
+    def _sanitize_video_payload(self, data: dict, source_text: str = "") -> dict:
+        out = data if isinstance(data, dict) else {}
+        ps = out.get("production_script") if isinstance(out.get("production_script"), dict) else {}
+        scenes_raw = ps.get("scenes") if isinstance(ps.get("scenes"), list) else []
+        scenes = [x for x in scenes_raw if isinstance(x, dict)]
+        src = str(source_text or "")
+        if scenes:
+            for s in scenes:
+                nar = str(s.get("narration") or "").strip()
+                if len(nar) > 80:
+                    nar = self._tight_line(nar, max_len=80)
+                sub = str(s.get("subtitle") or "").strip()
+                if not sub:
+                    sub = self._subtitle_from_narration(nar, max_len=28)
+                elif len(sub) > 28:
+                    sub = self._tight_line(sub, max_len=28)
+                if self._sim(nar, src) >= 0.95 and len(nar) >= 60:
+                    logger.warning(f"Scene narration too similar to source (>95%), truncating")
+                    nar = self._tight_line(nar[:50], max_len=80)
+                    sub = self._subtitle_from_narration(nar, max_len=28)
+                s["narration"] = nar
+                s["subtitle"] = sub
+            ps["scenes"] = scenes
+            out["production_script"] = ps
+        if not str(out.get("voice_text") or "").strip():
+            out["voice_text"] = "\n".join([str(s.get("narration") or "").strip() for s in scenes if str(s.get("narration") or "").strip()]).strip()
+        if self._sim(str(out.get("voice_text") or ""), src) >= 0.95 and len(str(out.get("voice_text") or "")) >= 200:
+            logger.warning("voice_text too similar to source (>95%), using scene narrations")
+            lines = [str(s.get("narration") or "").strip() for s in scenes if str(s.get("narration") or "").strip()]
+            out["voice_text"] = "\n".join(lines[:16]).strip()
+        if "subtitles" not in out or not isinstance(out.get("subtitles"), list):
+            out["subtitles"] = [{"text": str(s.get("subtitle") or "").strip()} for s in scenes if str(s.get("subtitle") or "").strip()]
+        else:
+            subs = []
+            for it in out.get("subtitles") or []:
+                txt = ""
+                if isinstance(it, dict):
+                    txt = str(it.get("text") or "").strip()
+                elif isinstance(it, str):
+                    txt = str(it).strip()
+                if len(txt) > 28:
+                    txt = self._tight_line(txt, max_len=28)
+                if txt:
+                    subs.append({"text": txt})
+            out["subtitles"] = subs
+        return out
 
     def _analyze_sync(self, content: str, post_type: str = "video", custom_instructions: str = None) -> dict:
         """Synchronous analysis logic to be wrapped in retry."""
@@ -80,28 +178,53 @@ class DeepSeekService:
                 "只返回JSON。"
             )
         else:
-            # Video Prompt
             system_prompt = (
-                "你是一个专业、严谨且富有创意的中文短视频总编导。"
-                "用户会给你一篇原始文章，你的任务是将其转化为高质量的短视频创作方案。"
-                "请严格按照以下步骤进行思考和创作："
-                "1. 【审稿】：首先判断文章内容是否合规、是否有价值。如果内容空洞、违规或完全无法转化为视频，请在 summary 中明确指出，但仍需尝试生成。"
-                "2. 【提炼与改写】：通读全文，提取核心观点和精华内容。必须对原文进行深度改写，将其转化为适合口播的、口语化的、有吸引力的短视频文案。禁止直接截取原文段落！每一段口播文案（narration）必须控制在60字以内，确保语速适中。"
-                "3. 【标题与标签】：根据改写后的文案，起一个极具吸引力（标题党但不过分）的标题，并提取精准的标签。"
-                "4. 【视觉方案】：为每一段文案设计具体的画面描述（visual_prompt_en），要求画面感强，能指导AI生图。"
-                "5. 【音乐方案】：选择最匹配文案情感的背景音乐。"
-                "请用JSON格式严格返回，字段包括："
-                "title（视频标题，30字以内，吸引人），summary（50字左右的内容摘要），"
-                "production_script（对象，包含："
-                "scenes（数组，每项包含：idx（从1开始），duration_sec（整数，建议4-8秒），narration（该段口播文案，必须是经过深度改写的、口语化的中文，禁止照搬原文，每段<=60字），subtitle（该段字幕，必须简短，如果口播较长，请在此处仅显示核心关键词或短句，避免字幕遮挡画面），visual_prompt_en（英文画面描述，必须具体、细致，包含主体、环境、风格、光影等细节，例如 'A futuristic city street at night, neon lights, cyberpunk style, cinematic lighting'），shot（镜头类型如 closeup/medium/wide），transition（转场如 cut/fade）），"
-                "cover（对象：visual_prompt_en（封面图英文描述，必须极具视觉冲击力，高品质，例如 'High quality 3D render of a glowing brain, dark background, cinematic, 8k'），title_text（封面主标题，简短有力），subtitle_text（封面副标题，可空）），"
-                "music（对象：mood（背景音乐情绪，如'cheerful'|'serious'|'relaxing'|'tech'|'lofi'|'ambient'|'piano'|'acoustic'|'hiphop'|'edm'|'synthwave'|'orchestral'|'corporate'|'jazz'|'rock'），tags（数组，音乐标签，如'ambient','piano','trap'））"
-                "），"
-                "voice_text（完整口播文案，由 scenes.narration 拼接而成，用于语音合成），"
-                "subtitles（数组，每项包含 text 字段；由 scenes.subtitle 汇总）。"
-                "警告：如果检测到文案与原文重复度过高，或者直接复制粘贴，你的回答将被判定为无效。"
-                "特别注意：narration 和 subtitle 必须包含清晰的标点符号（逗号、句号），禁止使用长难句，禁止一大段文字无标点。"
-                "只返回JSON，不要包含任何额外说明。"
+                "你是一个专业、严谨且富有创意的中文短视频总编导。\n"
+                "用户会给你一篇原始文章，你的任务是将其转化为高质量的短视频创作方案。\n\n"
+                "## 工作流程\n"
+                "1. 【审稿】判断文章是否合规、有价值。如内容空洞或违规，在summary中指出但仍需生成。\n"
+                "2. 【深度改写】提取核心观点，用口语化、生动有趣的方式重新表述。"
+                "narration（口播文案）必须是你自己创作的新文案，而非原文的删减版。"
+                "每段narration控制在50-60字，语感自然流畅，适合朗读。\n"
+                "3. 【字幕提炼】subtitle是narration的精华摘要，用于屏幕显示，每条15-20字，"
+                "必须是完整的短句而非碎片词语。\n"
+                "4. 【视觉设计】为每段设计具体的英文画面描述，细致到主体、环境、风格、光影。\n"
+                "5. 【音乐匹配】选择最匹配情感的BGM。\n\n"
+                "## 输出JSON结构\n"
+                "{\n"
+                '  "title": "视频标题，25字以内，极具吸引力",\n'
+                '  "summary": "50字左右的内容摘要",\n'
+                '  "production_script": {\n'
+                '    "scenes": [\n'
+                '      {\n'
+                '        "idx": 1,\n'
+                '        "duration_sec": 5,\n'
+                '        "narration": "口播文案，50-60字，口语化，有感染力，必须深度改写不能照搬原文",\n'
+                '        "subtitle": "字幕短句，15-20字，是narration的精华摘要",\n'
+                '        "visual_prompt_en": "Detailed English visual description, e.g. A futuristic lab with holographic displays, blue neon glow, cinematic 4k",\n'
+                '        "shot": "medium",\n'
+                '        "transition": "cut"\n'
+                '      }\n'
+                '    ],\n'
+                '    "cover": {\n'
+                '      "visual_prompt_en": "封面英文描述，极具冲击力",\n'
+                '      "title_text": "封面标题",\n'
+                '      "subtitle_text": ""\n'
+                '    },\n'
+                '    "music": {\n'
+                '      "mood": "tech",\n'
+                '      "tags": ["ambient","electronic"]\n'
+                '    }\n'
+                '  },\n'
+                '  "voice_text": "所有scenes.narration拼接，换行分隔",\n'
+                '  "subtitles": [{"text": "字幕1"}, {"text": "字幕2"}],\n'
+                '  "bgm_mood": "tech"\n'
+                "}\n\n"
+                "## 严格要求\n"
+                "- narration与原文相似度必须<70%，否则判为无效\n"
+                "- narration必须有标点（逗号、句号），禁止无标点长句\n"
+                "- subtitle必须是完整短句，不能只有关键词\n"
+                "- 只返回JSON，无任何额外文字\n"
             )
 
         try:
@@ -118,6 +241,14 @@ class DeepSeekService:
         # Truncate content
         user_content = content[:MAX_CONTENT_LENGTH]
         
+        content_len = len(user_content)
+        if content_len > 10000:
+            max_tok = 6000
+        elif content_len > 5000:
+            max_tok = 4800
+        else:
+            max_tok = 3600
+        
         response = self.client.chat.completions.create(
             model=settings.deepseek_model,
             messages=[
@@ -125,8 +256,8 @@ class DeepSeekService:
                 {"role": "user", "content": user_content}
             ],
             response_format={"type": "json_object"},
-            temperature=0.2,
-            max_tokens=2400
+            temperature=0.35,
+            max_tokens=max_tok
         )
         
         text = response.choices[0].message.content
@@ -174,7 +305,7 @@ class DeepSeekService:
             except Exception:
                 data = None
             if data is None:
-                return self._fallback_video(content, custom_instructions=custom_instructions)
+                return self._fallback_video(content, custom_instructions=custom_instructions, degraded_reason="deepseek_parse_failed")
             
         # Validation
         if post_type == "video":
@@ -217,6 +348,7 @@ class DeepSeekService:
                     data["voice_text"] = data["summary"]
                 else:
                     raise ValueError("Missing 'voice_text' in response")
+            data = self._sanitize_video_payload(data, source_text=content)
                  
         if post_type == "image_text" and "slides" not in data:
             if "summary" in data:
@@ -245,7 +377,7 @@ class DeepSeekService:
             pass
         if str(post_type or "video") == "image_text":
             return {"title": "AI图文", "summary": str(content or "")[:120], "slides": [{"text": str(content or "")[:200], "image_keyword": "abstract background"}], "bgm_mood": "neutral"}
-        return self._fallback_video(content, custom_instructions=custom_instructions)
+        return self._fallback_video(content, custom_instructions=custom_instructions, degraded_reason="deepseek_unavailable")
 
     def _translate_subtitles_sync(self, subtitles: list[str], target_lang: str) -> list[str]:
         if not self.client:

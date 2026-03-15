@@ -45,3 +45,5 @@ htmlcov/
 # Misc
 .DS_Store
 *.log
+static/worker_media/
+worker_media/

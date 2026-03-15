@@ -143,6 +143,9 @@ def make_asset_url(manifest: AssetManifest, build_id: str):
     def asset_url(logical_path: str) -> str:
         resolved = manifest.resolve(logical_path)
         if resolved:
+            if bid:
+                sep = "&" if "?" in resolved else "?"
+                return f"{resolved}{sep}v={bid}"
             return resolved
         p = str(logical_path or "").strip().lstrip("/")
         if not p:

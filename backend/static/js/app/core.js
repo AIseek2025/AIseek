@@ -433,12 +433,28 @@ const app = {
         const h = (location.hash || '').replace(/^#/, '');
         const parts = h.split('?');
         const path = parts[0] || '';
+        this.state.pendingSearchRoute = null;
         try {
             const qs = new URLSearchParams(parts[1] || '');
             const tab = String(qs.get('tab') || '').trim();
             const allow = new Set(['works', 'likes', 'favorites', 'history']);
             if (allow.has(tab)) this.state.pendingProfileTab = tab;
             else this.state.pendingProfileTab = null;
+            if (path === '/search') {
+                const q = String(qs.get('q') || qs.get('kw') || '').trim();
+                const smode = String(qs.get('smode') || qs.get('mode') || 'all').trim();
+                let qf = String(qs.get('qf') || qs.get('quality_filter') || '').trim();
+                if (!qf) {
+                    const lq = String(qs.get('lq') || '').trim();
+                    if (lq === '1' || lq.toLowerCase() === 'true') qf = 'cd';
+                }
+                if (!qf) qf = 'all';
+                const qth = Math.round(Number(qs.get('qth') || qs.get('qscore') || 70) || 70);
+                const qsort = String(qs.get('qsort') || qs.get('sort') || 'default').trim();
+                const svc = String(qs.get('svc') || '').trim();
+                const svk = String(qs.get('svk') || '').trim();
+                this.state.pendingSearchRoute = { q, smode, qf, qth, qsort, svc, svk };
+            }
         } catch (_) {
         }
 

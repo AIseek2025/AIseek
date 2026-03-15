@@ -35,12 +35,12 @@ def main() -> int:
     if status != 200:
         print("admin_login_failed", status, login)
         return 1
-    token = str(login.get("access_token") or "")
-    if not token:
-        print("no_token")
+    admin_token = str(login.get("access_token") or "")
+    if not admin_token:
+        print("no_admin_token")
         return 2
 
-    status, _, th = http_json("GET", f"{base}/api/v1/posts/admin/metrics/worker-callback/thresholds", headers={"authorization": f"Bearer {token}"})
+    status, _, th = http_json("GET", f"{base}/api/v1/posts/admin/metrics/worker-callback/thresholds", headers={"authorization": f"Bearer {admin_token}"})
     if status != 200:
         print("get_thresholds_failed", status, th)
         return 3
@@ -52,10 +52,22 @@ def main() -> int:
         return 4
     uid = int(reg["id"])
 
+    # 登录获取 token
+    status, _, login_resp = http_json(
+        "POST",
+        f"{base}/api/v1/auth/login",
+        {"username": u, "password": "pw"},
+    )
+    if status != 200:
+        print("login_failed", status, login_resp)
+        return 4
+    token = login_resp.get("access_token", "")
+
     status, _, post = http_json(
         "POST",
         f"{base}/api/v1/posts/create",
         {"content": "hello", "post_type": "video", "user_id": uid, "custom_instructions": None, "category": None, "voice_style": None, "bgm_mood": None, "title": "t"},
+        headers={"Authorization": f"Bearer {token}"} if token else {},
     )
     if status != 200:
         print("create_post_failed", status, post)
@@ -87,7 +99,7 @@ def main() -> int:
     status, _, alerts = http_json(
         "GET",
         f"{base}/api/v1/posts/admin/metrics/worker-callback/alerts?days=1&limit=50&include_acked=true",
-        headers={"authorization": f"Bearer {token}"},
+        headers={"authorization": f"Bearer {admin_token}"},
     )
     if status != 200:
         print("get_alerts_failed", status, alerts)
@@ -106,7 +118,7 @@ def main() -> int:
             "POST",
             f"{base}/api/v1/posts/admin/metrics/worker-callback/alerts/{urllib.parse.quote_plus(day)}/{urllib.parse.quote_plus(aid)}/ack",
             payload={},
-            headers={"authorization": f"Bearer {token}"},
+            headers={"authorization": f"Bearer {admin_token}"},
         )
         if status != 200:
             print("ack_failed", status, ack)

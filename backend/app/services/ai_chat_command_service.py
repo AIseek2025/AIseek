@@ -56,7 +56,7 @@ def _parse_cover_orientation(text: str) -> Optional[str]:
     if any(x in t for x in ["横屏", "横版", "16:9", "16：9"]):
         return "landscape"
     if any(x in t for x in ["方形", "1:1", "1：1", "正方形"]):
-        return "square"
+        return "portrait"
     return None
 
 
@@ -228,7 +228,7 @@ def build_ack_message(parsed: Dict[str, Any]) -> str:
             "- 换个女生配音 / 男声 / 新闻播报\n"
             "- BGM改成热门/欢快/舒缓/科技/电影感，或指定曲目（xxx.mp3）\n"
             "- 开启字幕/关闭字幕/中英字幕\n"
-            "- 竖屏/横屏/方形，最长90秒/2分钟\n"
+            "- 竖屏/横屏，最长90秒/2分钟\n"
             "- 标题改为：...\n"
             "- 分类改为：...\n"
             "- 附加指令：...\n"
