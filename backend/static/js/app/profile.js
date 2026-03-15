@@ -245,16 +245,25 @@ Object.assign(window.app, {
             } catch (_) {
             }
             
+            const uid = Number(u && u.id ? u.id : 0) || 0;
+            const avatarWrap = document.createElement('div');
+            avatarWrap.className = 'friend-avatar-wrap';
+            avatarWrap.style.cursor = 'pointer';
+            avatarWrap.dataset.action = 'call';
+            avatarWrap.dataset.fn = 'viewUserProfile';
+            avatarWrap.dataset.args = JSON.stringify([uid]);
+            avatarWrap.dataset.stop = '1';
             const img = document.createElement('img');
             img.className = 'friend-avatar';
             img.src = this.safeImgSrc(u && u.avatar ? String(u.avatar) : '');
+            avatarWrap.appendChild(img);
             const info = document.createElement('div');
             info.className = 'friend-info';
             const name = document.createElement('div');
             name.className = 'friend-name';
             name.innerText = String((u && (u.nickname || u.username)) || '');
             info.appendChild(name);
-            item.appendChild(img);
+            item.appendChild(avatarWrap);
             item.appendChild(info);
             panel.appendChild(item);
             
@@ -344,6 +353,9 @@ Object.assign(window.app, {
             requestAnimationFrame(() => {
                 try { this.initObserverIn(feed); } catch (_) {}
             });
+            setTimeout(() => {
+                try { feed.querySelectorAll('video').forEach(v => { v.load(); }); } catch (_) {}
+            }, 100);
             return true;
             
         } catch(e) {

@@ -1838,33 +1838,20 @@
 
   function bind() {
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showTab(t.getAttribute("data-tab"))));
-    $("btnQuickAdmin").addEventListener("click", async () => {
-      $("loginUser").value = "admin";
-      $("loginPass").value = "admin123";
-      try {
-        $("btnLogin").disabled = true;
-        await login("admin", "admin123");
-        renderAuthUI();
-        await initAfterLogin();
-      } catch (e) {
-        toast(`登录失败：${formatErr(e)}`);
-      } finally {
-        $("btnLogin").disabled = false;
-      }
-    });
-    $("btnLogin").addEventListener("click", async () => {
+    const btnLogin = $("btnLogin");
+    if (btnLogin) btnLogin.addEventListener("click", async () => {
       const u = String($("loginUser").value || "").trim();
       const p = String($("loginPass").value || "").trim();
       if (!u || !p) return toast("请输入用户名和密码");
       try {
-        $("btnLogin").disabled = true;
+        btnLogin.disabled = true;
         await login(u, p);
         renderAuthUI();
         await initAfterLogin();
       } catch (e) {
         toast(`登录失败：${formatErr(e)}`);
       } finally {
-        $("btnLogin").disabled = false;
+        btnLogin.disabled = false;
       }
     });
     $("btnCreate").addEventListener("click", createJob);
@@ -1910,6 +1897,20 @@
     }
   }
 
+  async function verifyTokenFromMainApp() {
+    const t = token();
+    if (!t) return false;
+    try {
+      const data = await apiFetch(`${API}/users/me`);
+      const u = (data && data.user) ? data.user : data;
+      if (u && (u.id || u.user_id)) {
+        setAuth(t, u.id || u.user_id, u.username);
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   async function bootstrap() {
     initTheme();
     initWorksViewMode();
@@ -1917,6 +1918,13 @@
     relocateWorkbenchBlocks();
     initWorkspaceModules();
     bind();
+    if (token() && !userId()) {
+      const ok = await verifyTokenFromMainApp();
+      if (!ok) {
+        const uid = ensureUserIdFromToken();
+        if (uid > 0) try { localStorage.setItem("user_id", String(uid)); } catch (_) {}
+      }
+    }
     renderAuthUI();
     await loadCategories();
     await loadMediaOptions();
