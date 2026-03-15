@@ -8,6 +8,8 @@ on:
 jobs:
   backup:
     runs-on: ubuntu-latest
+    # 仅在配置了 S3/OSS 备份密钥时执行（未配置则跳过，不报错）
+    if: ${{ secrets.BACKUP_S3_BUCKET != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
