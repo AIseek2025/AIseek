@@ -570,7 +570,7 @@
     </div>
 
     <div class="toast" id="toast"></div>
-    <div id="chainDiagBadge" style="position:fixed; right:10px; bottom:10px; z-index:2147483647; background:rgba(0,0,0,0.78); color:#fff; border:1px solid rgba(255,255,255,0.22); border-radius:10px; padding:8px 10px; font-size:11px; line-height:1.35; max-width:min(58vw,540px); white-space:pre-wrap;"></div>
+    <div id="chainDiagBadge" style="display:none; position:fixed; right:10px; bottom:10px; z-index:2147483647; background:rgba(0,0,0,0.78); color:#fff; border:1px solid rgba(255,255,255,0.22); border-radius:10px; padding:8px 10px; font-size:11px; line-height:1.35; max-width:min(58vw,540px); white-space:pre-wrap;"></div>
 
     <script src="/static/js/hls.min.js"></script>
     <script src="{{ asset_url('js/app/studio.js') }}"></script>
@@ -578,6 +578,11 @@
         (function () {
             const badge = document.getElementById('chainDiagBadge');
             if (!badge) return;
+            const showBadge = () => {
+                const q = new URLSearchParams(location.search || '');
+                return q.get('debug_chain') === '1' || String(localStorage.getItem('aiseek_debug_chain') || '') === '1';
+            };
+            if (showBadge()) badge.style.display = '';
             const build = '{{ build_id }}';
             const entry = (document.querySelector('script[src*="studio.js"]') || {}).src || '';
             let lastReport = '';

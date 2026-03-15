@@ -2500,7 +2500,7 @@
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="nav-item active" data-action="call" data-fn="switchPage" data-args='["recommend"]'><i class="fas fa-home"></i> 推荐</div>
-            <div class="nav-item" data-action="call" data-fn="switchPage" data-args='["jingxuan"]'><i class="fas fa-compass"></i> 精选</div>
+            <div class="nav-item" id="nav-jingxuan" data-action="call" data-fn="switchPage" data-args='["jingxuan"]'><i class="fas fa-compass"></i> 精选</div>
             <div class="nav-item" data-action="call" data-fn="switchPage" data-args='["following"]'><i class="fas fa-user-friends"></i> 关注</div>
             <div class="nav-item" data-action="call" data-fn="switchPage" data-args='["friends"]'><i class="fas fa-user-check"></i> 好友</div>
             <div class="nav-item" data-action="call" data-fn="switchPage" data-args='["profile"]'><i class="fas fa-user"></i> 我的</div>
@@ -3018,9 +3018,14 @@
     <script src="{{ asset_url('js/main.js') }}"></script>
     <script>
         (function () {
+            const showBadge = () => {
+                const q = new URLSearchParams(location.search || '');
+                return q.get('debug_chain') === '1' || String(localStorage.getItem('aiseek_debug_chain') || '') === '1';
+            };
             const badge = document.createElement('div');
             badge.id = 'chainDiagBadge';
             badge.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:2147483647;background:rgba(0,0,0,0.78);color:#fff;border:1px solid rgba(255,255,255,0.22);border-radius:10px;padding:8px 10px;font-size:11px;line-height:1.35;max-width:min(58vw,540px);white-space:pre-wrap;';
+            if (!showBadge()) badge.style.display = 'none';
             document.body.appendChild(badge);
             const build = '{{ build_id }}';
             const entry = (document.querySelector('script[src*="main.js"]') || {}).src || '';

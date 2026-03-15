@@ -711,17 +711,53 @@ Object.assign(window.app, {
         }
     },
 
+    _recommendPrefetchKey: null,
+    _recommendPrefetchPromise: null,
+
+    prefetchRecommendFeed: function() {
+        const params = [];
+        if (this.state.user) params.push(`user_id=${this.state.user.id}`);
+        params.push('limit=20');
+        const url = '/api/v1/posts/feed' + (params.length ? '?' + params.join('&') : '');
+        const key = url;
+        if (this._recommendPrefetchKey === key && this._recommendPrefetchPromise) return;
+        this._recommendPrefetchKey = key;
+        this._recommendPrefetchPromise = this.apiRequest('GET', url, undefined, { cancel_key: 'feed:recommend', dedupe_key: url });
+    },
+
+    _jingxuanPrefetchKey: null,
+    _jingxuanPrefetchPromise: null,
+
+    prefetchJingxuanFeed: function() {
+        const cat = this.state.category || 'all';
+        const params = [];
+        if (cat !== 'all') params.push(`category=${encodeURIComponent(cat)}`);
+        if (this.state.user) params.push(`user_id=${this.state.user.id}`);
+        params.push('limit=50');
+        const url = '/api/v1/posts/feed?' + params.join('&');
+        const key = url;
+        if (this._jingxuanPrefetchKey === key && this._jingxuanPrefetchPromise) return;
+        this._jingxuanPrefetchKey = key;
+        this._jingxuanPrefetchPromise = this.apiRequest('GET', url, undefined, { cancel_key: 'feed:jingxuan', dedupe_key: url });
+    },
+
     loadRecommend: async function() {
         const container = document.getElementById('page-recommend');
         container.innerHTML = '<div style="color:#888; display:flex; justify-content:center; align-items:center; height:100%;">加载中...</div>';
 
         try {
-            let url = '/api/v1/posts/feed';
             const params = [];
             if (this.state.user) params.push(`user_id=${this.state.user.id}`);
             params.push('limit=20');
-            if (params.length > 0) url += '?' + params.join('&');
-            const res = await this.apiRequest('GET', url, undefined, { cancel_key: 'feed:recommend', dedupe_key: url });
+            const url = '/api/v1/posts/feed' + (params.length ? '?' + params.join('&') : '');
+            let res;
+            if (this._recommendPrefetchKey === url && this._recommendPrefetchPromise) {
+                res = await this._recommendPrefetchPromise;
+                this._recommendPrefetchKey = null;
+                this._recommendPrefetchPromise = null;
+            } else {
+                res = await this.apiRequest('GET', url, undefined, { cancel_key: 'feed:recommend', dedupe_key: url });
+            }
             const nextCursor = res.headers ? res.headers.get('x-next-cursor') : null;
             const posts = await res.json();
             this.state.recommendPosts = posts;
@@ -2160,14 +2196,19 @@ Object.assign(window.app, {
         if (below) below.innerHTML = '';
         try {
             this.state.jingxuanLoadingMore = false;
-            let url = '/api/v1/posts/feed';
             const params = [];
-            if (this.state.category !== 'all') params.push(`category=${this.state.category}`);
+            if (this.state.category !== 'all') params.push(`category=${encodeURIComponent(this.state.category)}`);
             if (this.state.user) params.push(`user_id=${this.state.user.id}`);
             params.push('limit=50');
-            if (params.length > 0) url += '?' + params.join('&');
-
-            const res = await this.apiRequest('GET', url, undefined, { cancel_key: 'feed:jingxuan', dedupe_key: url });
+            const url = '/api/v1/posts/feed?' + params.join('&');
+            let res;
+            if (this._jingxuanPrefetchKey === url && this._jingxuanPrefetchPromise) {
+                res = await this._jingxuanPrefetchPromise;
+                this._jingxuanPrefetchKey = null;
+                this._jingxuanPrefetchPromise = null;
+            } else {
+                res = await this.apiRequest('GET', url, undefined, { cancel_key: 'feed:jingxuan', dedupe_key: url });
+            }
             if (!res.ok) throw new Error(`GET ${url} ${res.status}`);
             const posts = await res.json();
             this.state.jingxuanCursor = (res && res.headers && typeof res.headers.get === 'function') ? (res.headers.get('x-next-cursor') || null) : null;

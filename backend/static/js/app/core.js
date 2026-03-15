@@ -140,7 +140,8 @@ const app = {
         this.applyTheme();
         this.applyLanguage();
         try { this.applyUserBackgroundPrefs(); } catch (_) {}
-        await this.loadCategories();
+        // 不阻塞首屏：分类用于创作表单，可后台加载
+        void this.loadCategories();
         this.updateLayoutVars();
         window.addEventListener('resize', () => {
             clearTimeout(this._layoutTimer);
@@ -194,6 +195,13 @@ const app = {
             this.bindAuthHotkeys();
         }
         
+        // 提前预取推荐流，与 routeFromHash 并行，减少首屏等待
+        if (typeof this.prefetchRecommendFeed === 'function') this.prefetchRecommendFeed();
+        // 精选页：鼠标悬停时预取，切换时更快
+        const navJx = document.getElementById('nav-jingxuan');
+        if (navJx && typeof this.prefetchJingxuanFeed === 'function') {
+            navJx.addEventListener('mouseenter', () => this.prefetchJingxuanFeed(), { once: false });
+        }
         window.onhashchange = () => this.routeFromHash();
         this.routeFromHash();
     },

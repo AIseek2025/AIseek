@@ -374,7 +374,9 @@
       const cur = String(current.postId || "");
       const list = $("postList");
       if (list) list.classList.toggle("compact", worksViewMode === "compact");
-      $("postList").innerHTML = filtered
+      const emptyHtml = '<div class="muted2" style="padding:24px 12px; text-align:center; font-size:13px;">暂无创作，请先在左侧创建任务</div>';
+      list.innerHTML = filtered.length
+        ? filtered
         .map((p) => {
           const pid = Number(p.id || 0) || 0;
           const rawTitle = String(p.title || "");
@@ -397,7 +399,8 @@
             </div>
           `;
         })
-        .join("");
+        .join("")
+        : emptyHtml;
       document.querySelectorAll("#postList .card").forEach((el) => {
         el.querySelectorAll('[data-act="dl-toggle"]').forEach((btn) => {
           btn.addEventListener("click", async (ev) => {
@@ -991,7 +994,7 @@
     if (!btn || !dl) return;
     const enabled = !!(post && post.download_enabled);
     btn.dataset.enabled = enabled ? "1" : "0";
-    btn.textContent = enabled ? "下载：开" : "下载：关";
+    btn.innerHTML = `<i class="fas fa-${enabled ? "lock-open" : "lock"}"></i><span>下载：${enabled ? "开" : "关"}</span>`;
     dl.disabled = false;
   }
 
@@ -1011,7 +1014,7 @@
         body: JSON.stringify({ user_id: uid, download_enabled: next }),
       });
       btn.dataset.enabled = out && out.download_enabled ? "1" : "0";
-      btn.textContent = out && out.download_enabled ? "下载：开" : "下载：关";
+      btn.innerHTML = `<i class="fas fa-${out && out.download_enabled ? "lock-open" : "lock"}"></i><span>下载：${out && out.download_enabled ? "开" : "关"}</span>`;
       toast(out && out.download_enabled ? "已开启下载" : "已关闭下载");
       await refreshAll();
     } catch (e) {
@@ -1077,7 +1080,8 @@
   function applySubtitleTracks(tracks) {
     const ve = $("videoEl");
     const sel = $("subSel");
-    if (!ve || !sel) return;
+    const wrap = $("previewSubSelWrap");
+    if (!ve) return;
     const existing = Array.from(ve.querySelectorAll("track"));
     for (const t of existing) t.remove();
 
@@ -1093,10 +1097,12 @@
       })
       .filter(Boolean);
 
-    const opts = [`<option value="off">字幕：关</option>`].concat(
-      items.map((it) => `<option value="${escapeHtml(it.lang)}">${escapeHtml("字幕：" + it.label)}</option>`)
-    );
-    sel.innerHTML = opts.join("");
+    if (sel) {
+      const opts = [`<option value="off">字幕：关</option>`].concat(
+        items.map((it) => `<option value="${escapeHtml(it.lang)}">${escapeHtml("字幕：" + it.label)}</option>`)
+      );
+      sel.innerHTML = opts.join("");
+    }
 
     for (const it of items) {
       const tr = document.createElement("track");
@@ -1109,20 +1115,20 @@
     }
 
     const def = items.find((x) => x.isDefault) || items[0] || null;
-    sel.value = def ? def.lang : "off";
+    if (sel) sel.value = def ? def.lang : "off";
     syncSubtitleSelection();
+    if (wrap) wrap.style.display = items.length > 0 ? "" : "none";
   }
 
   function syncSubtitleSelection() {
     const ve = $("videoEl");
     const sel = $("subSel");
     if (!ve || !sel) return;
-    const val = String(sel.value || "off");
     const tracks = ve.textTracks;
     for (let i = 0; i < tracks.length; i++) {
       const tr = tracks[i];
       try {
-        tr.mode = val !== "off" && tr.language === val ? "showing" : "disabled";
+        tr.mode = "disabled";
       } catch (_) {}
     }
   }
@@ -1414,6 +1420,7 @@
     const parent = ve.parentElement;
     if (!parent) return;
     try { parent.style.position = "relative"; } catch (_) {}
+    try { parent.style.overflow = "hidden"; } catch (_) {}
     let box = $("videoSubtitleOverlay");
     if (!box) {
       box = document.createElement("div");
@@ -1752,6 +1759,8 @@
     const presetKey = "studio_workspace_preset_v4";
     const presets = {
       create: ["create", "task", "preview", "chat", "works"],
+      task: ["task", "create", "preview", "chat", "works"],
+      preview: ["preview", "task", "create", "chat", "works"],
       review: ["task", "preview", "works", "chat", "create"],
       chat: ["chat", "preview", "task", "create", "works"],
     };
