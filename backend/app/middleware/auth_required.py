@@ -29,7 +29,8 @@ class AuthRequiredMiddleware(BaseHTTPMiddleware):
         if path == "/api/v1/observability/events":
             return await call_next(request)
 
-        if path == "/api/v1/posts/callback":
+        path_norm = (path or "").rstrip("/") or "/"
+        if path_norm == "/api/v1/posts/callback":
             return await call_next(request)
 
         auth = request.headers.get("authorization") or request.headers.get("Authorization")

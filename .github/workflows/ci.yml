@@ -43,6 +43,7 @@ jobs:
         env:
           DATABASE_URL: sqlite:///sql_app.db
           REDIS_URL: redis://localhost:6379/0
+          WORKER_SECRET: m3pro_worker_2026
         run: |
           echo "=== Starting Smoke Tests ==="
           echo "Python version: $(python --version)"
