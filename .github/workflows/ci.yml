@@ -7,6 +7,16 @@ on:
 jobs:
   python:
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,9 +35,14 @@ jobs:
           python backend/scripts/theme_audit.py
           python backend/scripts/check_no_raw_fetch.py
       - name: Initialize database
+        env:
+          DATABASE_URL: sqlite:///sql_app.db
         run: |
           python backend/init_db.py
       - name: Smoke tests (with debug logging)
+        env:
+          DATABASE_URL: sqlite:///sql_app.db
+          REDIS_URL: redis://localhost:6379/0
         run: |
           echo "=== Starting Smoke Tests ==="
           echo "Python version: $(python --version)"
@@ -49,6 +64,10 @@ jobs:
             echo "  7 = callback_smoke_test.py failed"
             echo "  8 = worker_callback_alert_smoke_test.py failed"
             echo "  9 = e2e_ui_smoke.py (Playwright) failed"
+            echo "  10 = ai_pipeline_regression_guard.py failed"
+            echo "  11 = ai_long_text_quality_regression.py failed"
+            echo "  13 = strict_probe_guard.py failed"
+            echo "  14 = ai_content_integrity_guard.py failed"
           fi
           exit $EXIT_CODE
         continue-on-error: true
@@ -58,7 +77,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smoke-test-logs
-          path: smoke_test.log
+          path: |
+            smoke_test.log
+            ci_guard_report.json
+            ci_guard_summary.md
           retention-days: 7
       
       - name: Check database tables
