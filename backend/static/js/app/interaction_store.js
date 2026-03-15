@@ -52,12 +52,10 @@
                     icon.style.color = p.is_favorited ? '#ffb800' : 'var(--text-color)';
                 }
             }
-            const statsEl = slide.querySelector('.video-stats[data-post-id]');
-            if (statsEl && (p.likes_count !== undefined || p.views_count !== undefined) && window.app && typeof window.app._fmtViews === 'function') {
-                const post = (window.app.state.recommendPosts || []).find(x => x && Number(x.id) === pid);
-                const views = p.views_count !== undefined ? toInt(p.views_count) : (post ? toInt(post.views_count) : 0);
-                const likes = p.likes_count !== undefined ? toInt(p.likes_count) : (post ? toInt(post.likes_count) : 0);
-                statsEl.textContent = `播放 ${window.app._fmtViews(views)} · 点赞 ${window.app._fmtViews(likes)}`;
+            const viewEl = slide.querySelector('.v-view-count[data-post-id]');
+            if (viewEl && p.views_count !== undefined && window.app && typeof window.app._fmtViews === 'function') {
+                const views = toInt(p.views_count);
+                viewEl.innerHTML = `<i class="fas fa-eye"></i> ${window.app._fmtViews(views)}`;
             }
         });
     };

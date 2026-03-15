@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -37,6 +38,49 @@ def _sanitize_lines(text: str) -> list[str]:
         if p2:
             out.append(p2)
     return out
+
+
+def _split_by_sentence_punct(text: str) -> list[str]:
+    """Split text by sentence-ending punctuation. Each result is one phrase, punctuation stripped."""
+    t = str(text or "").strip()
+    if not t:
+        return []
+    parts = re.split(r"[。！？；,.!?;:：]\s*", t)
+    out = [re.sub(r"[。！？；,.!?;:：、]", "", p).strip() for p in parts if p and p.strip()]
+    return out if out else [re.sub(r"[。！？；,.!?;:：\s]+", "", t) or t]
+
+
+def expand_segments_by_sentences(
+    segments: list[str],
+    times: list[tuple[float, float]],
+) -> tuple[list[str], list[tuple[float, float]]]:
+    """Split segments by punctuation into one phrase per cue; proportionally split times."""
+    if not segments or not times or len(segments) != len(times):
+        return segments, times
+    new_seg, new_t = [], []
+    for seg, (st, ed) in zip(segments, times):
+        parts = _split_by_sentence_punct(seg)
+        if len(parts) <= 1:
+            new_seg.append(str(seg or "").strip())
+            new_t.append((float(st), float(ed)))
+        else:
+            total = max(1, sum(len(p) for p in parts))
+            t = float(st)
+            dur = float(ed) - t
+            for p in parts:
+                r = len(p) / total
+                d = dur * r
+                new_seg.append(p.strip())
+                new_t.append((t, t + d))
+                t += d
+    return new_seg, new_t
+
+
+def _single_line_no_punct(text: str, max_chars: int = 22) -> str:
+    """Single line, strip punctuation for display. One phrase per cue."""
+    t = str(text or "").strip()
+    t = re.sub(r"[。！？；,.!?;:：、]", "", t)
+    return (t[:max_chars] + "…") if len(t) > max_chars else t
 
 
 def _wrap_two_lines(text: str, max_chars: int) -> str:
@@ -181,7 +225,7 @@ def build_vtt_from_cues(
     lines.append("")
 
     for i, (start, end, seg) in enumerate(items, start=1):
-        txt = _wrap_two_lines(seg, max_chars=max_chars_per_line)
+        txt = _single_line_no_punct(seg, max_chars=max_chars_per_line)
         if not txt:
             continue
         lines.append(str(i))
