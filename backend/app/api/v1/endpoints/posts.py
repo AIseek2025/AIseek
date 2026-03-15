@@ -532,6 +532,9 @@ def get_user_posts(
             })
     items = _serialize_posts_base(posts)
     _backfill_ai_job_ids(items, db)
+    from app.services.post_presenter import backfill_bgm_names
+
+    backfill_bgm_names(items, db)
     return decorate_flags(items, viewer_id or user_id, db)
 
 
@@ -605,6 +608,9 @@ def search_posts(
         by_id = {int(p.id): p for p in posts if p}
         ordered = [by_id[i] for i in ids if i in by_id]
         items = _serialize_posts_base(ordered)
+        from app.services.post_presenter import backfill_bgm_names
+
+        backfill_bgm_names(items, db)
         return {"items": items, "next_cursor": nxt}
 
     payload = None
@@ -663,6 +669,9 @@ def get_post(
                 if int(user_id) == int(post0.user_id) and str(post0.status) in {"processing", "queued", "failed", "returned", "preview"}:
                     base0 = _serialize_post_base(post0)
                     _backfill_ai_job_ids([base0], db)
+                    from app.services.post_presenter import backfill_bgm_names
+
+                    backfill_bgm_names([base0], db)
                     items0 = decorate_flags([base0], user_id, db)
                     return items0[0]
     except Exception:
@@ -680,6 +689,9 @@ def get_post(
     if not base:
         raise HTTPException(status_code=404, detail="Post not found")
     _backfill_ai_job_ids([base], db)
+    from app.services.post_presenter import backfill_bgm_names
+
+    backfill_bgm_names([base], db)
     items = decorate_flags([base], user_id, db)
     return items[0]
 

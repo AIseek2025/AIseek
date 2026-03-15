@@ -104,6 +104,7 @@
         'postComment',
         'deletePost',
         'startChat',
+        'shareProfileLink',
         'openFollowModal',
         'setLanguage',
         'setTheme',

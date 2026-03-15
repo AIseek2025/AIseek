@@ -541,13 +541,14 @@ Object.assign(window.app, {
                 actionBtn = `<i class="fas fa-edit" style="font-size:16px; color:#666; cursor:pointer;" data-action="openEditProfile"></i>`;
             } else {
                 const dmMeta = JSON.stringify({ id: user.id, nickname: user.nickname || user.username, username: user.username, avatar: user.avatar, aiseek_id: user.aiseek_id, is_friend: !!profile.is_friend });
-                const dmBtn = `<button class="btn-primary" style="width:88px; height:34px; padding:0; background:#333; margin-left:8px; font-size:14px;" data-action="call" data-fn="startChat" data-args='[${user.id}, ${dmMeta}]'>私信</button>`;
+                const dmBtn = `<button class="btn-primary" style="width:88px; height:34px; padding:0; background:var(--primary-color); color:#0a0e14; border:none; margin-left:8px; font-size:14px; font-weight:700; border-radius:var(--radius-sm);" data-action="call" data-fn="startChat" data-args='[${user.id}, ${dmMeta}]'>私信</button>`;
                 
                 const followText = profile.is_following ? '已关注' : '关注';
-                const followBg = profile.is_following ? '#333' : '#fe2c55';
-                const followBtn = `<button class="btn-primary" style="width:88px; height:34px; padding:0; background:${followBg}; font-size:14px;" data-action="call" data-fn="toggleFollow" data-args='[${user.id}]'>${followText}</button>`;
+                const followBg = profile.is_following ? 'var(--surface-soft)' : 'var(--primary-color)';
+                const followColor = profile.is_following ? 'var(--text-color)' : '#0a0e14';
+                const followBtn = `<button class="btn-primary" style="width:88px; height:34px; padding:0; background:${followBg}; color:${followColor}; border:1px solid var(--border-color); font-size:14px; font-weight:700; border-radius:var(--radius-sm);" data-action="call" data-fn="toggleFollow" data-args='[${user.id}]'>${followText}</button>`;
                 
-                const shareBtn = `<button class="btn-primary" style="width:34px; height:34px; padding:0; background:#333; margin-left:8px; display:flex; align-items:center; justify-content:center;" data-action="alert" data-message="链接已复制"><i class="fas fa-share"></i></button>`;
+                const shareBtn = `<button class="btn-primary" style="width:34px; height:34px; padding:0; background:var(--surface-soft); color:var(--text-color); border:1px solid var(--border-color); margin-left:8px; display:flex; align-items:center; justify-content:center; border-radius:var(--radius-sm);" data-action="call" data-fn="shareProfileLink" data-args='[${user.id}]'><i class="fas fa-share"></i></button>`;
                 
                 actionBtn = `<div style="display:flex; align-items:center;">${followBtn}${dmBtn}${shareBtn}</div>`;
             }
@@ -599,6 +600,30 @@ Object.assign(window.app, {
         } catch(e) {
             console.error(e);
             header.innerHTML = '<div style="color:#888; padding:20px;">加载失败</div>';
+        }
+    },
+
+    shareProfileLink: function(userId) {
+        const uid = Number(userId || 0);
+        if (!uid) return;
+        const base = location.origin + (location.pathname || '/');
+        const url = `${base}#/u/${uid}`;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => { try { this.showToast('链接已复制'); } catch (_) {} });
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                try { this.showToast('链接已复制'); } catch (_) {}
+            }
+        } catch (_) {
+            try { this.showToast('复制失败'); } catch (_) {}
         }
     },
 

@@ -1232,9 +1232,15 @@ Object.assign(window.app, {
 
     sendDMMessage: async function() {
         if (!this.state.user) return this.openModal('authModal');
-        if (!this.state.dmPeerId) return;
+        if (!this.state.dmPeerId) {
+            try { this.showToast('请先选择一个会话'); } catch (_) {}
+            return;
+        }
         const input = document.getElementById('dm_input');
-        if (!input || !input.value) return;
+        if (!input || !String(input.value || '').trim()) {
+            try { this.showToast('请输入消息内容'); } catch (_) {}
+            return;
+        }
         const peerId = Number(this.state.dmPeerId || 0);
         const isFriend = this.dmIsFriend(peerId);
         const sentOnce = this.state.dmNonFriendSentIds && typeof this.state.dmNonFriendSentIds.has === 'function' ? this.state.dmNonFriendSentIds.has(peerId) : false;
@@ -1244,8 +1250,9 @@ Object.assign(window.app, {
             return;
         }
         try { this.dmUndeletePeer(peerId); } catch (_) {}
-        const content = String(input.value || '');
+        const content = String(input.value || '').trim();
         input.value = '';
+        if (!content) return;
 
         try {
             const res = await this.apiRequest('POST', '/api/v1/messages/send', { sender_id: this.state.user.id, receiver_id: this.state.dmPeerId, content }, { cancel_key: `dm:send:${peerId}` });

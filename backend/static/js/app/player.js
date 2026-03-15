@@ -1,4 +1,11 @@
 Object.assign(window.app, {
+    _fmtViews: function(n) {
+        const v = Number(n || 0);
+        if (v >= 100000000) return (v / 100000000).toFixed(1).replace(/\.0$/, '') + '亿';
+        if (v >= 10000) return (v / 10000).toFixed(1).replace(/\.0$/, '') + '万';
+        return String(v);
+    },
+
     _prefetchKey: function(url) {
         const s = String(url || '');
         let h = 2166136261;
@@ -533,18 +540,17 @@ Object.assign(window.app, {
         this._applySubtitleVisualStyle(box);
         const subUrl = this._pickSubtitleUrl(post);
         if (!subUrl) {
-            const fallback = String((post && (post.narration || post.content_text || post.title)) || '').trim();
-            this._setSubtitleOverlayText(box, this._subtitleDisplayText(fallback));
+            try { box.style.display = 'none'; } catch (_) {}
             return;
         }
         if (!this.state._subtitleCueCache) this.state._subtitleCueCache = {};
         const cacheKey = subUrl;
         const bindTicker = (cues) => {
             if (!Array.isArray(cues) || !cues.length) {
-                const fallback = String((post && (post.narration || post.content_text || post.title)) || '').trim();
-                this._setSubtitleOverlayText(box, this._subtitleDisplayText(fallback));
+                try { box.style.display = 'none'; } catch (_) {}
                 return;
             }
+            try { box.style.display = ''; } catch (_) {}
             let prev = '';
             let lastNonEmpty = String((cues[0] && cues[0].body) || '').trim();
             const tick = () => {
@@ -560,7 +566,7 @@ Object.assign(window.app, {
                     }
                     if (!cur && t < Number((cues[0] && cues[0].st) || 0)) cur = String((cues[0] && cues[0].body) || '');
                     if (cur && cur.trim()) lastNonEmpty = cur;
-                    if (!cur) cur = lastNonEmpty || String((post && (post.narration || post.content_text || post.title)) || '').trim();
+                    if (!cur) cur = lastNonEmpty || '';
                     if (cur !== prev) {
                         prev = cur;
                         this._setSubtitleOverlayText(box, this._subtitleDisplayText(cur));
@@ -928,7 +934,8 @@ Object.assign(window.app, {
                     <div class="video-info-overlay">
                         <div class="video-author" data-action="call" data-fn="viewUserProfile" data-args="[${post.user_id}]" data-stop="1">@${nickname}</div>
                         <div class="video-desc">${desc}</div>
-                        <div class="video-music"><i class="fas fa-music"></i> 原声 - ${nickname}</div>
+                        <div class="video-music"><i class="fas fa-music"></i> ${(post.bgm_name && String(post.bgm_name).trim()) ? String(post.bgm_name).trim() : '原声'} - ${nickname}</div>
+                        <div class="video-stats" data-post-id="${post.id}">播放 ${this._fmtViews(post.views_count || 0)} · 点赞 ${this._fmtViews(post.likes_count || 0)}</div>
                     </div>
 
                     <!-- Controls Bar -->
@@ -1945,6 +1952,12 @@ Object.assign(window.app, {
                 if (video) {
                     const pid = bestSlide.dataset ? parseInt(bestSlide.dataset.postId || '0', 10) : 0;
                     if (pid) { this.recordWatch(pid); this.state.activePostId = pid; }
+                    const slides = document.querySelectorAll('.video-slide');
+                    const isFirstSlide = slides.length > 0 && slides[0] === bestSlide;
+                    if (isFirstSlide) {
+                        try { video.muted = false; video.volume = Number(this.state.globalVolume || 0.5) || 0.5; } catch (_) {}
+                        try { this.state.isMuted = false; localStorage.setItem('is_muted', '0'); this._syncGlobalVolumeUIAll(); } catch (_) {}
+                    }
                     const p = video.play();
                     if (p) p.then(() => { if (btnPlay) btnPlay.className = 'fas fa-pause'; }).catch(async () => {
                         try { video.muted = true; video.volume = 0; await video.play(); if (btnPlay) btnPlay.className = 'fas fa-pause'; } catch (_) { if (btnPlay) btnPlay.className = 'fas fa-play'; }
@@ -2069,6 +2082,11 @@ Object.assign(window.app, {
         try {
             document.querySelectorAll(`.jx-view-count[data-post-id="${pid}"]`).forEach(el => {
                 el.textContent = `播放 ${fmtViews(next)}`;
+            });
+            document.querySelectorAll(`.video-stats[data-post-id="${pid}"]`).forEach(el => {
+                const p = (this.state.recommendPosts || []).find(x => x && Number(x.id) === pid);
+                const likes = p ? (Number(p.likes_count) || 0) : 0;
+                el.textContent = `播放 ${fmtViews(next)} · 点赞 ${fmtViews(likes)}`;
             });
         } catch (_) {
         }

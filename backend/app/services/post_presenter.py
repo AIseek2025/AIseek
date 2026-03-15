@@ -1,8 +1,9 @@
-from typing import Any, Dict, List, Optional
-
-from sqlalchemy.orm import Session
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from app.core.config import get_settings
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 from app.models.all_models import Follow, Interaction, Post
 
 
@@ -183,6 +184,47 @@ def serialize_post_base(post: Post, delta: Optional[Dict[str, int]] = None) -> D
         "is_following": False,
         "error_message": getattr(post, "error_message", None),
     }
+
+
+def _bgm_id_to_name(bgm_id: Optional[str]) -> str:
+    """Derive human-readable BGM name from bgm_id (e.g. tech_1.mp3 -> Tech 1)."""
+    if not bgm_id or not isinstance(bgm_id, str):
+        return ""
+    s = str(bgm_id).strip()
+    if not s:
+        return ""
+    if s.lower().endswith(".mp3"):
+        s = s[:-4]
+    s = s.replace("_", " ").replace("-", " ")
+    s = " ".join(s.split())
+    return s.title() if s else ""
+
+
+def backfill_bgm_names(items: List[Dict[str, Any]], db: "Session") -> None:
+    """Add bgm_name to items from AIJob input_json when ai_job_id present."""
+    try:
+        from app.models.all_models import AIJob
+
+        job_ids = [str(it.get("ai_job_id") or "").strip() for it in items if isinstance(it, dict) and it.get("ai_job_id")]
+        job_ids = [j for j in job_ids if j]
+        if not job_ids:
+            return
+        jobs = db.query(AIJob).filter(AIJob.id.in_(job_ids)).all()
+        by_id = {}
+        for j in jobs:
+            if j and j.id:
+                inp = getattr(j, "input_json", None)
+                if isinstance(inp, dict) and inp.get("bgm_id"):
+                    by_id[str(j.id)] = _bgm_id_to_name(str(inp.get("bgm_id") or ""))
+        if by_id:
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                jid = str(it.get("ai_job_id") or "").strip()
+                if jid and jid in by_id and by_id[jid]:
+                    it["bgm_name"] = by_id[jid]
+    except Exception:
+        pass
 
 
 def serialize_posts_base(posts: List[Post]) -> List[Dict[str, Any]]:

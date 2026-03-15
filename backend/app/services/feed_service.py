@@ -12,7 +12,7 @@ from app.core.config import get_settings
 from app.models.all_models import Interaction, Post
 from app.services.feed_recall import get_runtime_kind, recall_candidates
 from app.services.ab_service import get_variant
-from app.services.post_presenter import decorate_flags, serialize_post_base, serialize_posts_base
+from app.services.post_presenter import backfill_bgm_names, decorate_flags, serialize_post_base, serialize_posts_base
 from app.utils.cursor import decode_cursor, encode_cursor, cursor_datetime
 
 
@@ -122,6 +122,7 @@ def _get_pending_items(db: Session, user_id: int, category: Optional[str], limit
     if not pend:
         return []
     pi = _serialize_posts_base(pend, db)
+    backfill_bgm_names(pi, db)
     return decorate_flags(pi, user_id, db)
 
 
@@ -325,6 +326,7 @@ def get_feed(db: Session, *, category: Optional[str], user_id: Optional[int], li
                     "id": int(last.id),
                 })
         items = _serialize_posts_base(posts, db)
+        backfill_bgm_names(items, db)
         return FeedResult(items=decorate_flags(items, user_id, db), next_cursor=next_cur, ab_variant=ab_variant)
 
     candidates = _get_candidates(db, cat_key)
@@ -350,6 +352,7 @@ def get_feed(db: Session, *, category: Optional[str], user_id: Optional[int], li
                     }
                 )
         items = _serialize_posts_base(posts, db)
+        backfill_bgm_names(items, db)
         return FeedResult(items=pending_items + decorate_flags(items, user_id, db), next_cursor=next_cur, ab_variant=ab_variant)
 
     rs_used = None
@@ -424,6 +427,7 @@ def get_feed(db: Session, *, category: Optional[str], user_id: Optional[int], li
 
     ordered = _hydrate_posts(db, ids)
     items = _serialize_posts_base(ordered, db)
+    backfill_bgm_names(items, db)
     try:
         s = get_settings()
         if bool(getattr(s, "FEED_DIVERSITY_ENABLED", True)):

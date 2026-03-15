@@ -503,6 +503,8 @@ const app = {
         this.state.pinnedPostId = postId;
         this.state.recommendCursor = null;
         this.state.recommendLoadingMore = false;
+        document.body.classList.remove('profile-hero');
+        try { document.body.style.setProperty('--profile-hero-bg', 'none'); } catch (_) {}
         const container = document.getElementById('page-recommend');
         document.querySelectorAll('.page-container').forEach(el => el.classList.remove('active'));
         container.classList.add('active');
