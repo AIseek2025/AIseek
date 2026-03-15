@@ -94,15 +94,6 @@
     let t = "dark";
     try { t = localStorage.getItem("studio_theme") || "dark"; } catch (_) {}
     applyTheme(t);
-    let tt = "pure";
-    try { tt = localStorage.getItem("studio_title_tone") || "pure"; } catch (_) {}
-    applyTitleTone(tt);
-    let den = "comfortable";
-    try { den = localStorage.getItem("studio_density") || "comfortable"; } catch (_) {}
-    applyDensity(den);
-    let b = "stable";
-    try { b = localStorage.getItem("studio_brand") || "stable"; } catch (_) {}
-    applyBrand(b);
   }
 
   function applyDensity(density) {
@@ -114,22 +105,7 @@
   }
 
   function initWorksViewMode() {
-    try { worksViewMode = localStorage.getItem("studio_works_view_mode") || "card"; } catch (_) { worksViewMode = "card"; }
-    worksViewMode = worksViewMode === "compact" ? "compact" : "card";
-    const list = $("postList");
-    if (list) {
-      list.classList.toggle("compact", worksViewMode === "compact");
-    }
-    const b1 = $("btnWorksCompact");
-    const b2 = $("btnWorksCard");
-    if (b1) b1.classList.toggle("btn-primary", worksViewMode === "compact");
-    if (b2) b2.classList.toggle("btn-primary", worksViewMode !== "compact");
-  }
-
-  function setWorksViewMode(mode) {
-    worksViewMode = mode === "compact" ? "compact" : "card";
-    try { localStorage.setItem("studio_works_view_mode", worksViewMode); } catch (_) {}
-    initWorksViewMode();
+    worksViewMode = "list";
   }
 
   function withNoCache(path) {
@@ -373,7 +349,6 @@
       } catch (_) {}
       const cur = String(current.postId || "");
       const list = $("postList");
-      if (list) list.classList.toggle("compact", worksViewMode === "compact");
       const emptyHtml = '<div class="muted2" style="padding:24px 12px; text-align:center; font-size:13px;">暂无创作，请先在左侧创建任务</div>';
       list.innerHTML = filtered.length
         ? filtered
@@ -419,8 +394,7 @@
           if (pid) selectPost(pid);
         });
       });
-      const more = $("btnLoadMorePosts");
-      if (more) more.style.display = !postState.done ? "" : "none";
+      try { window.studioLoadMore = !postState.done && !postState.loading ? () => loadMyPosts(false) : null; } catch (_) {}
       return filtered;
     } catch (e) {
       $("postList").innerHTML = '<div class="muted" style="padding:10px 6px;">加载失败，请刷新或重新登录</div>';
@@ -1759,6 +1733,8 @@
     const presetKey = "studio_workspace_preset_v4";
     const presets = {
       create: ["create", "task", "preview", "chat", "works"],
+      task: ["task", "create", "preview", "chat", "works"],
+      preview: ["preview", "task", "create", "chat", "works"],
       review: ["task", "preview", "works", "chat", "create"],
       chat: ["chat", "preview", "task", "create", "works"],
     };
@@ -1790,16 +1766,12 @@
     };
 
     try {
-      const presetSel = $("layoutPreset");
       const raw = localStorage.getItem(key);
-      const presetSaved = String(localStorage.getItem(presetKey) || "custom");
-      if (presetSel) presetSel.value = presetSaved;
       const saved = raw ? JSON.parse(raw) : null;
       const order = Array.isArray(saved) && saved.length ? saved.map((x) => String(x || "")) : defaults;
       applyOrder(order, false);
     } catch (_) {}
 
-    const enableModuleDrag = false;
     let dragging = null;
     const saveOrder = () => {
       try {
@@ -1810,75 +1782,19 @@
     board.querySelectorAll(".ws-module[data-module]").forEach((mod) => {
       try { mod.setAttribute("draggable", "false"); } catch (_) {}
       const handle = mod.querySelector(".drag-handle");
-      if (handle) {
-        if (!enableModuleDrag) {
-          try { handle.style.display = "none"; } catch (_) {}
-          return;
-        }
-        handle.addEventListener("mousedown", () => {
-          mod.dataset.dragReady = "1";
-          try { mod.setAttribute("draggable", "true"); } catch (_) {}
-        });
-        handle.addEventListener("mouseup", () => {
-          delete mod.dataset.dragReady;
-          try { mod.setAttribute("draggable", "false"); } catch (_) {}
-        });
-        handle.addEventListener("mouseleave", () => {
-          delete mod.dataset.dragReady;
-          try { mod.setAttribute("draggable", "false"); } catch (_) {}
-        });
       }
-      mod.addEventListener("dragstart", (e) => {
-        if (mod.dataset.dragReady !== "1") {
-          e.preventDefault();
-          try { mod.setAttribute("draggable", "false"); } catch (_) {}
-          return;
-        }
-        dragging = mod;
-        mod.classList.add("dragging");
-        try { e.dataTransfer.effectAllowed = "move"; } catch (_) {}
-      });
-      mod.addEventListener("dragend", () => {
-        mod.classList.remove("dragging");
-        delete mod.dataset.dragReady;
-        try { mod.setAttribute("draggable", "false"); } catch (_) {}
-        dragging = null;
-        try { localStorage.setItem(presetKey, "custom"); } catch (_) {}
-        const presetSel = $("layoutPreset");
-        if (presetSel) presetSel.value = "custom";
-        saveOrder();
-      });
     });
-    if (!enableModuleDrag) return;
-    board.addEventListener("dragover", (e) => {
-      if (!dragging) return;
-      e.preventDefault();
-      const el = document.elementFromPoint(Number(e.clientX || 0), Number(e.clientY || 0));
-      const target = el && el.closest ? el.closest(".ws-module[data-module]") : null;
-      if (!target || target === dragging) return;
-      const rect = target.getBoundingClientRect();
-      const before = Number(e.clientY || 0) < (rect.top + rect.height / 2);
-      board.insertBefore(dragging, before ? target : target.nextSibling);
-    });
-    board.addEventListener("drop", (e) => {
-      if (!dragging) return;
-      e.preventDefault();
-      saveOrder();
-    });
+    try { window.studioSaveModuleOrder = saveOrder; } catch (_) {}
 
     applyLayoutPreset = (name) => {
       const n = String(name || "custom");
       if (n === "custom") return;
       const order = presets[n] || presets.create;
       applyOrder(order, true);
-      try { localStorage.setItem(presetKey, n); } catch (_) {}
-      const presetSel = $("layoutPreset");
-      if (presetSel) presetSel.value = n;
     };
     resetWorkspaceLayout = () => {
       applyOrder(defaults, true);
       try { localStorage.removeItem(key); } catch (_) {}
-      try { localStorage.setItem(presetKey, "create"); } catch (_) {}
     };
   }
 
@@ -1953,17 +1869,10 @@
     });
     $("btnCreate").addEventListener("click", createJob);
     try { $("btnTheme").addEventListener("click", () => applyTheme(document.body.getAttribute("data-theme") === "light" ? "dark" : "light")); } catch (_) {}
-    try { $("btnTitleTone").addEventListener("click", () => applyTitleTone(document.body.getAttribute("data-title-tone") === "soft" ? "pure" : "soft")); } catch (_) {}
-    try { $("btnBrand").addEventListener("click", () => applyBrand(document.body.getAttribute("data-brand") === "vivid" ? "stable" : "vivid")); } catch (_) {}
-    try { $("btnDensity").addEventListener("click", () => applyDensity(document.body.getAttribute("data-density") === "compact" ? "comfortable" : "compact")); } catch (_) {}
-    try { $("btnResetLayout").addEventListener("click", () => { if (resetWorkspaceLayout) resetWorkspaceLayout(); }); } catch (_) {}
-    try { $("layoutPreset").addEventListener("change", (e) => { if (applyLayoutPreset) applyLayoutPreset(e && e.target ? e.target.value : "custom"); }); } catch (_) {}
-    try { $("btnWorksCompact").addEventListener("click", () => setWorksViewMode("compact")); } catch (_) {}
-    try { $("btnWorksCard").addEventListener("click", () => setWorksViewMode("card")); } catch (_) {}
     try { $("btnUploadVoiceSample").addEventListener("click", uploadVoiceSample); } catch (_) {}
     try { $("btnUploadAvatarSample").addEventListener("click", uploadAvatarSample); } catch (_) {}
     $("btnRefreshPosts").addEventListener("click", loadMyPosts);
-    $("btnLoadMorePosts").addEventListener("click", () => loadMyPosts(false));
+    try { const lb = $("btnLoadMorePosts"); if (lb) lb.addEventListener("click", () => loadMyPosts(false)); } catch (_) {}
     $("postFilter").addEventListener("change", loadMyPosts);
     $("btnReloadPreview").addEventListener("click", loadPreview);
     try { $("subSel").addEventListener("change", syncSubtitleSelection); } catch (_) {}

@@ -472,19 +472,11 @@ Object.assign(window.app, {
         const el = box;
         if (!el) return;
         const mode = this._subtitleStyleMode();
-        if (mode === 'sharp') {
-            el.style.fontWeight = '700';
-            el.style.letterSpacing = '0';
-            el.style.textShadow = '0 2px 8px rgba(0,0,0,.95), 0 0 2px rgba(0,0,0,.92)';
-            el.style.background = 'linear-gradient(180deg, rgba(0,0,0,.24), rgba(0,0,0,.44))';
-            el.style.backdropFilter = 'blur(0px)';
-            return;
-        }
-        el.style.fontWeight = '600';
-        el.style.letterSpacing = '.01em';
-        el.style.textShadow = '0 1px 4px rgba(0,0,0,.88)';
-        el.style.background = 'linear-gradient(180deg, rgba(0,0,0,.12), rgba(0,0,0,.24))';
-        el.style.backdropFilter = 'blur(2px)';
+        el.style.fontWeight = mode === 'sharp' ? '700' : '600';
+        el.style.letterSpacing = mode === 'sharp' ? '0' : '.01em';
+        el.style.textShadow = mode === 'sharp' ? '0 2px 8px rgba(0,0,0,.95), 0 0 2px rgba(0,0,0,.92)' : '0 1px 4px rgba(0,0,0,.88)';
+        el.style.background = 'none';
+        el.style.backdropFilter = 'none';
     },
 
     _setSubtitleOverlayText: function(box, text) {
@@ -512,7 +504,7 @@ Object.assign(window.app, {
             box.style.position = 'absolute';
             box.style.left = '16px';
             box.style.right = '16px';
-            box.style.bottom = 'calc(130px + env(safe-area-inset-bottom, 0px))';
+            box.style.bottom = 'calc(180px + env(safe-area-inset-bottom, 0px))';
             box.style.zIndex = '23';
             box.style.color = '#fff';
             box.style.fontSize = 'clamp(14px, 1.9vw, 17px)';
@@ -1921,59 +1913,53 @@ Object.assign(window.app, {
         if (this._recommendObserver && typeof this._recommendObserver.disconnect === 'function') {
             try { this._recommendObserver.disconnect(); } catch (_) {}
         }
+        const ratioCache = this._recommendRatioCache || (this._recommendRatioCache = new WeakMap());
         const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => { ratioCache.set(entry.target, entry.intersectionRatio); });
+            const page = document.getElementById('page-recommend');
+            if (!page) return;
+            const slides = Array.from(page.querySelectorAll('.video-slide'));
+            let bestSlide = null;
+            let bestRatio = 0;
+            slides.forEach(slide => {
+                const r = ratioCache.get(slide);
+                if (typeof r === 'number' && r >= 0.6 && r > bestRatio) { bestRatio = r; bestSlide = slide; }
+            });
+            this.pauseAllVideosExcept(null);
             entries.forEach(entry => {
-                const video = entry.target.querySelector('video');
-                const btnPlay = entry.target.querySelector('[id^=btn-play-]');
-                if (!video) return;
-
                 if (entry.intersectionRatio >= 0.08) {
                     this._scheduleIdle(() => {
                         try {
-                            const slides = Array.from(document.querySelectorAll('#page-recommend .video-slide'));
                             const idx = slides.indexOf(entry.target);
                             if (idx >= 0) {
                                 if (idx + 1 < slides.length) this._prewarmSlideMedia(slides[idx + 1]);
                                 if (idx + 2 < slides.length) this._prewarmSlideMedia(slides[idx + 2]);
                             }
-                        } catch (_) {
-                        }
+                        } catch (_) {}
                     });
                 }
-
-                if (entry.intersectionRatio >= 0.6) {
-                    const pid = entry.target && entry.target.dataset ? parseInt(entry.target.dataset.postId || '0', 10) : 0;
-                    if (pid) this.recordWatch(pid);
-                    if (pid) this.state.activePostId = pid;
-                    this.pauseAllVideosExcept(video);
-                    const p = video.play();
-                    if (p) {
-                        p.then(() => {
-                            if (btnPlay) btnPlay.className = 'fas fa-pause';
-                        }).catch(async () => {
-                            try {
-                                video.muted = true;
-                                video.volume = 0;
-                                await video.play();
-                                if (btnPlay) btnPlay.className = 'fas fa-pause';
-                            } catch (_) {
-                                if (btnPlay) btnPlay.className = 'fas fa-play';
-                            }
-                        });
-                    }
-
-                    try {
-                        const slides = Array.from(document.querySelectorAll('#page-recommend .video-slide'));
-                        const idx = slides.indexOf(entry.target);
-                        if (idx >= 0 && slides.length - idx <= 3) this.loadMoreRecommend();
-                    } catch (_) {
-                    }
-                } else {
-                    video.pause();
-                    video.currentTime = 0;
-                    if(btnPlay) btnPlay.className = 'fas fa-play';
-                }
             });
+            if (bestSlide) {
+                const video = bestSlide.querySelector('video');
+                const btnPlay = bestSlide.querySelector('[id^=btn-play-]');
+                if (video) {
+                    const pid = bestSlide.dataset ? parseInt(bestSlide.dataset.postId || '0', 10) : 0;
+                    if (pid) { this.recordWatch(pid); this.state.activePostId = pid; }
+                    const p = video.play();
+                    if (p) p.then(() => { if (btnPlay) btnPlay.className = 'fas fa-pause'; }).catch(async () => {
+                        try { video.muted = true; video.volume = 0; await video.play(); if (btnPlay) btnPlay.className = 'fas fa-pause'; } catch (_) { if (btnPlay) btnPlay.className = 'fas fa-play'; }
+                    });
+                    const idx = slides.indexOf(bestSlide);
+                    if (idx >= 0 && slides.length - idx <= 3) this.loadMoreRecommend();
+                }
+            } else {
+                slides.forEach(slide => {
+                    const v = slide.querySelector('video');
+                    const btn = slide.querySelector('[id^=btn-play-]');
+                    if (v) { v.pause(); v.currentTime = 0; }
+                    if (btn) btn.className = 'fas fa-play';
+                });
+            }
         }, options);
         this._recommendObserver = observer;
         try {

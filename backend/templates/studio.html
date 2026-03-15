@@ -8,224 +8,119 @@
     <title>AI创作工作台 - AIseek</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body, body * {
-            -webkit-user-select: text !important;
-            user-select: text !important;
-        }
-        button, .btn, [role="button"], .status-pill, .drag-handle {
-            -webkit-user-select: none !important;
-            user-select: none !important;
-        }
+        body, body * { -webkit-user-select: text !important; user-select: text !important; }
+        button, .btn, [role="button"], .status-pill, .drag-handle { -webkit-user-select: none !important; user-select: none !important; }
         :root {
             --bg: #0a0e14;
             --surface: #141a23;
-            --surface-soft: #1a2230;
             --text: #f0f4f8;
-            --muted: rgba(240,244,248,0.68);
-            --muted2: rgba(240,244,248,0.50);
-            --stroke: rgba(255,255,255,0.12);
-            --stroke-soft: rgba(255,255,255,0.08);
+            --muted: rgba(240,244,248,0.65);
+            --muted2: rgba(240,244,248,0.45);
+            --stroke: rgba(255,255,255,0.10);
             --primary: #00d4aa;
             --primary-hover: #00e6b8;
-            --title-bg: rgba(0,212,170,0.90);
             --r-sm: 8px;
             --r-md: 12px;
-            --r-lg: 16px;
             --s-1: 8px;
-            --s-2: 16px;
-            --s-3: 24px;
-            --dur-fast: 120ms;
-            --dur-base: 180ms;
+            --s-2: 14px;
+            --s-3: 20px;
+            --dur: 160ms;
             --good: #4ade80;
             --warn: #fbbf24;
             --bad: #f87171;
         }
         body[data-theme="light"] {
-            --bg: #f8fafc;
+            --bg: #f0f2f5;
             --surface: #ffffff;
-            --surface-soft: #f1f5f9;
             --text: #0f172a;
-            --muted: rgba(15,23,42,0.74);
-            --muted2: rgba(15,23,42,0.56);
+            --muted: rgba(15,23,42,0.65);
+            --muted2: rgba(15,23,42,0.45);
             --stroke: rgba(15,23,42,0.12);
-            --stroke-soft: rgba(15,23,42,0.08);
             --primary: #0d9488;
             --primary-hover: #0f766e;
-            --title-bg: rgba(13,148,136,0.90);
-        }
-        body[data-title-tone="soft"] { --title-bg: rgba(0,212,170,0.72); }
-        body[data-theme="light"][data-title-tone="soft"] { --title-bg: rgba(13,148,136,0.62); }
-        body[data-brand="vivid"] {
-            --primary: #00e6b8;
-            --title-bg: rgba(0,230,184,0.94);
-        }
-        body[data-theme="light"][data-brand="vivid"] {
-            --primary: #14b8a6;
-            --title-bg: rgba(20,184,166,0.90);
-        }
-        body[data-density="compact"] {
-            --s-1: 6px;
-            --s-2: 12px;
-            --s-3: 18px;
         }
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background: radial-gradient(1200px 520px at 4% -12%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 62%), var(--bg); color: var(--text); }
+        body { margin: 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background: var(--bg); color: var(--text); }
         a { color: inherit; text-decoration: none; }
-        .topbar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: color-mix(in srgb, var(--bg) 96%, #000 4%); position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--stroke); backdrop-filter: blur(12px); }
-        .topbar .row { flex-wrap: nowrap; gap: 8px; min-width: 0; }
-        .topbar .row:last-child { margin-left: auto; justify-content: flex-end; flex: 1; }
-        .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px; letter-spacing: -0.02em; }
-        .brand .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 8px var(--primary); }
-        .pill { display: inline-flex; align-items: center; gap: var(--s-1); padding: 8px 11px; border-radius: 999px; background: var(--surface-soft); border: 1px solid var(--stroke); transition: all var(--dur-fast) cubic-bezier(.2,.8,.2,1); }
-        .pill:hover { background: var(--surface); }
-        .btn { display: inline-flex; align-items: center; gap: var(--s-1); border: 0; cursor: pointer; border-radius: var(--r-sm); height: 36px; padding: 0 12px; background: var(--surface-soft); color: var(--text); border: 1px solid var(--stroke); transition: all var(--dur-fast) cubic-bezier(.2,.8,.2,1); font-size: 13px; font-weight: 600; }
-        .btn:hover { background: var(--surface); transform: translateY(-1px); }
-        .btn span { white-space: nowrap; }
-        .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, #00b894 100%); border-color: var(--primary); color: #0a0e14; font-weight: 700; box-shadow: 0 2px 8px rgba(0,212,170,0.3); }
-        .btn-primary:hover { background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,212,170,0.4); }
-        .btn-danger { background: rgba(248,113,113,0.15); border-color: rgba(248,113,113,0.35); }
-        .btn-danger:hover { background: rgba(248,113,113,0.22); }
-        .btn-small { height: 32px; padding: 0 10px; border-radius: var(--r-sm); font-size: 12px; font-weight: 600; }
-        .layout { padding: var(--s-2); min-height: calc(100vh - 62px); max-width: 1800px; margin: 0 auto; }
-        .workspace-board { height: auto; overflow: visible; column-count: 3; column-gap: var(--s-2); }
-        .workspace-board::-webkit-scrollbar { width: 8px; height: 8px; }
-        .workspace-board::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 999px; }
-        .workspace-board::-webkit-scrollbar-track { background: transparent; }
-        .ws-module { width: 100%; break-inside: avoid; margin: 0 0 var(--s-2); background: color-mix(in srgb, var(--surface) 98%, transparent); border: 1px solid var(--stroke); border-radius: var(--r-md); overflow: hidden; display: flex; flex-direction: column; min-height: 220px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: box-shadow var(--dur-base) ease; }
-        .ws-module:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        .ws-module[data-size="wide"] { width: 100%; }
-        .ws-module.dragging { opacity: .66; transform: scale(.995); }
-        .module-h { padding: 0 14px; border-bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--s-1); background: linear-gradient(135deg, var(--title-bg), color-mix(in srgb, var(--title-bg) 78%, #000 22%)); height: 42px; min-height: 42px; }
-        .module-h .title { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.03em; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
-        .module-b { padding: var(--s-2); overflow: visible; min-height: 0; flex: 1; background: transparent; }
-        .module-b::-webkit-scrollbar { width: 8px; height: 8px; }
-        .module-b::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 999px; }
-        .module-b::-webkit-scrollbar-track { background: transparent; }
-        .drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--r-sm); border: 1px solid var(--stroke); background: var(--surface-soft); color: var(--muted); cursor: grab; user-select: none; }
-        .drag-handle:active { cursor: grabbing; }
-        body, .ws-module, .module-b, .msg .c, .kv .v, .input, .textarea, pre {
-            -webkit-user-select: text !important;
-            user-select: text !important;
-        }
-        #mod-create { min-height: max(700px, calc(100vh - 94px)); }
-        #mod-create .module-b { overflow: visible; }
-        #mod-task, #mod-preview, #mod-chat, #mod-works { min-height: 0; }
-        #mod-works .module-b { max-height: 620px; overflow: auto; }
-        #mod-chat { min-height: 320px; }
-        #mod-works { min-height: 320px; }
-        #midBody { overflow: visible; }
-        .right-events { border-top: 0; padding: 12px 0 0; background: transparent; }
-        .section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: var(--s-1); }
-        .section-head .t { font-weight: 800; font-size: 13px; letter-spacing: 0.2px; color: rgba(255,255,255,0.90); }
-        .section-tag { font-size: 11px; color: rgba(255,255,255,0.55); padding: 3px 9px; border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; background: rgba(255,255,255,0.05); }
-        .muted { color: var(--muted); }
-        .muted2 { color: var(--muted2); }
-        .hr { display: none; }
-        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-        .field label { font-size: 12px; font-weight: 600; color: var(--muted); }
-        .input, .select, .textarea { background: var(--surface-soft); border: 1px solid var(--stroke); color: var(--text); border-radius: var(--r-sm); padding: 10px 12px; outline: none; transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease; font-size: 13px; }
-        .input:focus, .select:focus, .textarea:focus { border-color: rgba(0,212,170,0.55); box-shadow: 0 0 0 2px rgba(0,212,170,0.18); }
+        .topbar { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: var(--surface); border-bottom: 1px solid var(--stroke); position: sticky; top: 0; z-index: 20; }
+        .topbar .row { flex-wrap: nowrap; gap: 8px; align-items: center; }
+        .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; }
+        .brand .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+        .pill { display: inline-flex; align-items: center; gap: var(--s-1); padding: 6px 12px; border-radius: var(--r-sm); background: var(--bg); border: 1px solid var(--stroke); font-size: 13px; transition: all var(--dur) ease; }
+        .pill:hover { border-color: var(--primary); color: var(--primary); }
+        .btn { display: inline-flex; align-items: center; gap: var(--s-1); border: 1px solid var(--stroke); cursor: pointer; border-radius: var(--r-sm); height: 34px; padding: 0 12px; background: var(--bg); color: var(--text); font-size: 13px; font-weight: 600; transition: all var(--dur) ease; }
+        .btn:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-primary { background: var(--primary); border-color: var(--primary); color: #0a0e14; }
+        .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+        .btn-danger { border-color: rgba(248,113,113,0.5); color: var(--bad); }
+        .btn-small { height: 30px; padding: 0 10px; font-size: 12px; }
+        .layout { padding: var(--s-2); min-height: calc(100vh - 54px); }
+        .workspace-board { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: flex-start; align-content: flex-start; }
+        .ws-module { width: 360px; min-width: 320px; max-width: 420px; background: var(--surface); border: 1px solid var(--stroke); border-radius: var(--r-md); overflow: hidden; display: flex; flex-direction: column; min-height: 200px; cursor: move; transition: box-shadow var(--dur) ease; }
+        .ws-module:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+        .ws-module.dragging { opacity: 0.7; cursor: grabbing; }
+        .ws-module .module-h { padding: 0 14px; height: 40px; display: flex; align-items: center; justify-content: space-between; background: var(--bg); border-bottom: 1px solid var(--stroke); cursor: grab; }
+        .ws-module .module-h:active { cursor: grabbing; }
+        .ws-module .module-h .title { font-size: 13px; font-weight: 700; color: var(--text); }
+        .ws-module .module-b { padding: var(--s-2); overflow: visible; flex: 1; min-height: 0; }
+        .ws-module .module-b::-webkit-scrollbar { width: 6px; }
+        .ws-module .module-b::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        .field { margin-bottom: var(--s-2); }
+        .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+        .input, .select, .textarea { width: 100%; background: var(--bg); border: 1px solid var(--stroke); color: var(--text); border-radius: var(--r-sm); padding: 10px 12px; font-size: 13px; outline: none; transition: border-color var(--dur) ease; }
+        .input:focus, .select:focus, .textarea:focus { border-color: var(--primary); }
         .input::placeholder, .textarea::placeholder { color: var(--muted2); }
-        .select { width: 100%; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .textarea { min-height: 140px; resize: vertical; }
+        .select { cursor: pointer; }
+        .textarea { min-height: 120px; resize: vertical; }
         .row { display: flex; gap: var(--s-1); align-items: center; flex-wrap: wrap; }
         .grow { flex: 1; min-width: 0; }
         .form-grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .form-grid-three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-        .inline-grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); margin-bottom: 12px; }
-        .inline-grid-three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-2); margin-bottom: 12px; }
-        .inline-ctl { display: flex; align-items: center; gap: var(--s-1); }
-        .inline-ctl .name { font-size: 12px; color: var(--muted); min-width: 42px; white-space: nowrap; }
+        .inline-ctl { display: flex; align-items: center; gap: 8px; }
+        .inline-ctl .name { font-size: 12px; color: var(--muted); min-width: 56px; }
         .inline-ctl .select { flex: 1; min-width: 0; }
-        .inline-ctl.wide .name { min-width: 44px; }
-        .inline-ctl.wide .select { min-width: 198px; }
-        .bgm-track-full { margin-top: 6px; font-size: 12px; color: var(--muted2); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
-        .badge { font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--stroke); background: transparent; color: var(--muted); }
-        .badge.good { color: var(--good); border-color: rgba(74,222,128,0.35); background: rgba(74,222,128,0.10); }
-        .badge.warn { color: var(--warn); border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.10); }
-        .badge.bad { color: var(--bad); border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.10); }
-        .list { display: flex; flex-direction: column; gap: 10px; }
-        .card { background: transparent; border: 0; border-radius: var(--r-sm); padding: var(--s-2); transition: all var(--dur-base) ease; }
-        .card:hover { border-color: transparent; }
-        .card.active { border-color: rgba(0,212,170,0.55); box-shadow: 0 0 0 1px rgba(0,212,170,0.22) inset; }
-        .card-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .card-title .t { font-size: 13px; font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .card-sub { font-size: 12px; color: var(--muted2); margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
-        .works-card-list .card-title .t { max-width: none; width: 100%; }
-        .status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); border: 1px solid var(--stroke); border-radius: 999px; height: 26px; padding: 0 10px; background: color-mix(in srgb, var(--surface-soft) 90%, transparent); }
-        .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; opacity: .9; }
+        .section-label { font-size: 12px; font-weight: 700; color: var(--primary); margin: var(--s-2) 0 var(--s-1); padding-bottom: 6px; border-bottom: 1px solid var(--stroke); }
+        .section-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 8px 0; font-size: 13px; color: var(--muted); }
+        .section-toggle:hover { color: var(--text); }
+        .section-toggle i { transition: transform var(--dur) ease; }
+        .section-toggle.collapsed i { transform: rotate(-90deg); }
+        .section-optional { margin-top: var(--s-1); }
+        .section-optional.collapsed { display: none; }
+        .badge { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--stroke); color: var(--muted); }
+        .badge.good { color: var(--good); }
+        .badge.warn { color: var(--warn); }
+        .badge.bad { color: var(--bad); }
+        .status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); border: 1px solid var(--stroke); border-radius: 999px; height: 24px; padding: 0 10px; }
+        .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
         .status-pill.good { color: var(--good); }
         .status-pill.warn { color: var(--warn); }
         .status-pill.bad { color: var(--bad); }
-        .tabs { display: flex; gap: var(--s-1); padding: 8px 0; border-bottom: 0; background: transparent; }
-        .tab { cursor: pointer; padding: 8px 10px; border-radius: var(--r-sm); border: 1px solid var(--stroke-soft); color: var(--muted); background: transparent; font-size: 13px; transition: all var(--dur-fast) ease; }
-        .tab:hover { border-color: var(--stroke); background: var(--surface); }
-        .tab.active { color: #0a0e14; border-color: var(--primary); background: var(--primary); }
-        .editor { width: 100%; min-height: 240px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; font-size: 12px; line-height: 1.4; }
-        .video { width: 100%; aspect-ratio: 16/9; border-radius: 12px; background: #000; border: 1px solid rgba(255,255,255,0.14); object-fit: contain; }
-        #mod-preview .module-b { padding: 0; }
-        #mod-preview .card { padding: 0; }
-        #mod-preview .video-preview-wrap { line-height: 0; }
-        #mod-preview .video { display: block; border: 0; border-radius: 0; width: 100%; height: auto; aspect-ratio: auto; object-fit: contain; max-height: 600px; }
-        #mod-preview .row { padding: 10px 12px; }
-        #mod-preview #mediaList { margin: 0 12px 12px; }
-        .kv { display: grid; grid-template-columns: 92px 1fr; gap: 8px 10px; font-size: 12px; }
-        .kv .k { color: var(--muted2); }
-        .kv .v { color: rgba(255,255,255,0.86); word-break: break-all; }
-        .chat { display: flex; flex-direction: column; gap: 10px; }
-        .chat-log { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow: auto; padding-right: 4px; }
-        .msg { padding: 10px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.14); }
-        .msg.user { border-color: rgba(0,212,170,0.28); }
-        .msg.assistant { border-color: rgba(96,165,250,0.25); }
-        .msg .r { font-size: 11px; color: var(--muted2); margin-bottom: 6px; }
-        .msg .c { white-space: pre-wrap; font-size: 13px; line-height: 1.55; color: rgba(255,255,255,0.88); }
-        .chat-input { display: flex; gap: 10px; align-items: flex-start; }
-        .chat-input textarea { min-height: 100px; resize: vertical; flex: 1; min-width: 0; }
-        .chat-input .btn-primary { flex-shrink: 0; align-self: stretch; }
-        .works-card-list.compact .card { padding: 7px 8px; border-radius: var(--r-sm); }
-        .works-card-list.compact .card-sub { font-size: 11px; margin-top: 4px; }
-        .works-card-list.compact .card-title .t { font-size: 12px; max-width: 180px; }
+        .tabs { display: flex; gap: 4px; }
+        .tab { cursor: pointer; padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid var(--stroke); color: var(--muted); font-size: 12px; transition: all var(--dur) ease; }
+        .tab:hover { color: var(--text); }
+        .tab.active { background: var(--primary); border-color: var(--primary); color: #0a0e14; }
         body[data-theme="light"] .tab.active { color: #fff; }
-        .toast { position: fixed; right: 16px; bottom: 16px; background: rgba(0,0,0,0.72); color: rgba(255,255,255,0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 10px 12px; max-width: 420px; display: none; z-index: 99; box-shadow: 0 16px 38px rgba(0,0,0,0.36); }
+        .list { display: flex; flex-direction: column; gap: 10px; }
+        .card { padding: var(--s-2); border-radius: var(--r-sm); border: 1px solid transparent; cursor: pointer; transition: border-color var(--dur) ease; }
+        .card.active { border: 1px solid var(--primary); }
+        .kv { display: grid; grid-template-columns: 80px 1fr; gap: 6px 10px; font-size: 12px; }
+        .kv .k { color: var(--muted2); }
+        .kv .v { color: var(--text); word-break: break-all; }
+        .msg { padding: 10px; border-radius: var(--r-sm); border: 1px solid var(--stroke); margin-bottom: 8px; }
+        .msg.user { border-color: rgba(0,212,170,0.3); }
+        .msg .r { font-size: 11px; color: var(--muted2); margin-bottom: 4px; }
+        .msg .c { font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+        .chat-log { max-height: 320px; overflow-y: auto; margin-bottom: 10px; }
+        .chat-input { display: flex; gap: 10px; }
+        .chat-input textarea { flex: 1; min-height: 80px; resize: vertical; }
+        #mod-works .module-b { max-height: 480px; overflow-y: auto; }
+        #mod-works .module-b.has-more { overflow-y: scroll; }
+        .video { width: 100%; aspect-ratio: 16/9; border-radius: var(--r-sm); background: #000; object-fit: contain; }
+        .toast { position: fixed; right: 16px; bottom: 16px; background: rgba(0,0,0,0.8); color: #fff; border-radius: var(--r-sm); padding: 10px 14px; max-width: 360px; display: none; z-index: 99; }
         .toast.show { display: block; }
-        @media (max-width: 1560px) {
-            .workspace-board { column-count: 2; }
-            #mod-create { min-height: 640px; }
-        }
-        @media (max-width: 1320px) {
-            #buildTag { display: none; }
-        }
-            @media (max-width: 1200px) {
-            .layout { height: auto; min-height: 0; }
-            .workspace-board { height: auto; column-count: 1; }
-            #mod-create, #mod-task, #mod-preview, #mod-chat, #mod-works { min-height: 0; }
-            #mod-works .module-b { max-height: none; }
-            .form-grid-two, .form-grid-three { grid-template-columns: 1fr; }
-            .inline-grid-two, .inline-grid-three { grid-template-columns: 1fr; }
-            .topbar .row:last-child { flex: 1; justify-content: flex-end; }
-            #layoutPreset { display: none; }
-        }
+        #mod-create { min-height: 420px; }
+        #btnLoadMorePosts { display: none !important; }
     </style>
-    <script>
-        (function () {
-            const isControl = function (el) {
-                try {
-                    return !!(el && el.closest && el.closest('button,.btn,[role="button"],.drag-handle,.status-pill,input,textarea,select,option,a'));
-                } catch (_) {
-                    return false;
-                }
-            };
-            document.addEventListener('selectstart', function (e) {
-                if (isControl(e.target)) return;
-                try { e.stopImmediatePropagation(); } catch (_) {}
-            }, true);
-            document.addEventListener('dragstart', function (e) {
-                if (isControl(e.target)) return;
-                try { e.preventDefault(); } catch (_) {}
-                try { e.stopImmediatePropagation(); } catch (_) {}
-            }, true);
-        })();
-    </script>
 </head>
 <body>
     <div class="topbar">
@@ -235,482 +130,171 @@
             <span class="muted2" id="buildTag">{{ build_id }}</span>
         </div>
         <div class="row">
-            <select class="select" id="layoutPreset" style="width:auto; min-width:100px; height:32px; padding:0 8px; font-size:12px;">
-                <option value="create">布局：创作优先</option>
-                <option value="task">布局：任务优先</option>
-                <option value="preview">布局：预览优先</option>
-                <option value="custom">自定义</option>
-            </select>
             <button class="btn btn-small" id="btnTheme" title="切换深色/浅色"><i class="fas fa-circle-half-stroke"></i><span id="themeLabel">主题</span></button>
-            <button class="btn btn-small" id="btnTitleTone" title="标题栏颜色"><i class="fas fa-fill-drip"></i><span id="titleToneLabel">红阶</span></button>
-            <button class="btn btn-small" id="btnBrand" title="品牌色"><i class="fas fa-palette"></i><span id="brandLabel">稳重</span></button>
-            <button class="btn btn-small" id="btnDensity" title="间距密度"><i class="fas fa-arrows-up-down"></i><span id="densityLabel">舒适</span></button>
-            <button class="btn btn-small" id="btnResetLayout" title="重置模块顺序"><i class="fas fa-rotate-left"></i><span>重置</span></button>
         </div>
     </div>
 
     <div class="layout">
         <div class="workspace-board" id="workspaceBoard">
-            <section class="ws-module" id="mod-create" data-module="create" data-size="narrow" draggable="false">
-            <div class="module-h">
-                <div class="title">1. 新建AI视频任务</div>
-                <div class="row">
-                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
-                </div>
-            </div>
+            <section class="ws-module" id="mod-create" data-module="create">
+            <div class="module-h"><div class="title">1. 新建AI视频任务</div><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span></div>
             <div class="module-b">
-                <div id="loginBox" class="card" style="padding:20px;">
-                    <div class="row" style="justify-content:space-between; margin-bottom:16px;">
-                        <div style="font-weight:700; font-size:15px;">登录工作台</div>
-                        <span class="muted2" style="font-size:11px;">与主站账号通用</span>
-                    </div>
-                    <div class="field">
-                        <label>用户名</label>
-                        <input class="input" id="loginUser" placeholder="admin / testuser / demo">
-                    </div>
-                    <div class="field">
-                        <label>密码</label>
-                        <input class="input" id="loginPass" type="password" placeholder="admin123 / test123 / demo123">
-                    </div>
-                    <div class="row" style="gap:10px; margin-top:8px;">
-                        <button class="btn btn-primary grow" id="btnLogin"><i class="fas fa-right-to-bracket"></i>登录</button>
-                        <button class="btn grow" id="btnQuickAdmin">Admin 快捷</button>
-                    </div>
+                <div id="loginBox" class="card">
+                    <div style="font-weight:700; margin-bottom:14px;">登录工作台</div>
+                    <div class="field"><label>用户名</label><input class="input" id="loginUser" placeholder="admin / testuser / demo"></div>
+                    <div class="field"><label>密码</label><input class="input" id="loginPass" type="password" placeholder="admin123 / test123 / demo123"></div>
+                    <div class="row" style="margin-top:12px;"><button class="btn btn-primary grow" id="btnLogin"><i class="fas fa-right-to-bracket"></i>登录</button><button class="btn grow" id="btnQuickAdmin">Admin 快捷</button></div>
                 </div>
-
-                <div id="createBox" class="card" style="display:none;">
-                    <div class="row" style="justify-content:flex-end; margin-bottom:4px;">
-                        <span class="badge warn" id="cooldownBadge" style="display:none;"><i class="fas fa-clock"></i> 冷却中</span>
-                    </div>
-                    <div class="field">
-                        <label>标题（可选）</label>
-                        <input class="input" id="inTitle" placeholder="例如：5分钟搞懂 RAG 与 Agent">
-                    </div>
-                    <div class="field">
-                        <label>标签（可选）</label>
-                        <input class="input" id="inTags" placeholder="多个标签用空格/逗号分隔，如 AI 创作 科普">
-                    </div>
-                    <div class="field">
-                        <label>用户文稿（必填，将转为口播稿/脚本）</label>
-                        <textarea class="textarea" id="inContent" placeholder="粘贴你的长文稿或要点，支持多段文本..."></textarea>
-                    </div>
-                    <div class="inline-grid-two">
-                        <div class="inline-ctl">
-                            <span class="name">分类</span>
-                            <select class="select" id="inCategory"></select>
+                <div id="createBox" style="display:none;">
+                    <div class="row" style="justify-content:flex-end; margin-bottom:6px;"><span class="badge warn" id="cooldownBadge" style="display:none;"><i class="fas fa-clock"></i> 冷却中</span></div>
+                    <div class="section-label">必填项</div>
+                    <div class="field"><label>用户文稿（将转为口播稿/脚本）</label><textarea class="textarea" id="inContent" placeholder="粘贴你的长文稿或要点，支持多段文本..."></textarea></div>
+                    <div class="section-label">选填项（AI自动生成）</div>
+                    <div class="section-toggle" id="toggleOptional"><i class="fas fa-chevron-down"></i><span>展开/收起选填项</span></div>
+                    <div class="section-optional" id="optionalFields">
+                        <div class="field"><label>标题</label><input class="input" id="inTitle" placeholder="例如：5分钟搞懂 RAG 与 Agent"></div>
+                        <div class="field"><label>标签</label><input class="input" id="inTags" placeholder="多个标签用空格/逗号分隔"></div>
+                        <div class="form-grid-two">
+                            <div class="field"><label>分类</label><select class="select" id="inCategory"></select></div>
+                            <div class="field"><label>口播风格</label><select class="select" id="inVoice"><option value="premium_female">高拟真女声（中文）</option><option value="premium_male">高拟真男声（中文）</option><option value="premium_news">专业播报（中文）</option><option value="premium_en">高拟真女声（EN）</option></select></div>
                         </div>
-                        <div class="inline-ctl">
-                            <span class="name">口播风格</span>
-                            <select class="select" id="inVoice">
-                                <option value="premium_female">高拟真女声（中文）</option>
-                                <option value="premium_male">高拟真男声（中文）</option>
-                                <option value="premium_news">专业播报（中文）</option>
-                                <option value="premium_en">高拟真女声（EN）</option>
-                            </select>
+                        <div class="form-grid-two">
+                            <div class="field"><label>BGM 氛围</label><select class="select" id="inBgm"><option value="">默认</option><option value="none">无BGM</option><option value="tech">科技感</option><option value="cheerful">轻快</option><option value="serious">严肃</option><option value="relaxing">舒缓</option><option value="warm">温暖</option><option value="cinematic">电影感</option><option value="lofi">LoFi</option><option value="ambient">氛围</option><option value="piano">钢琴</option><option value="acoustic">原声吉他</option><option value="hiphop">嘻哈节奏</option><option value="edm">电子/EDM</option><option value="synthwave">合成波</option><option value="orchestral">史诗管弦</option><option value="corporate">商务轻快</option><option value="jazz">爵士</option><option value="rock">摇滚</option></select></div>
+                            <div class="field"><label>BGM 曲目</label><select class="select" id="inBgmTrack"><option value="">自动</option></select></div>
                         </div>
+                        <div class="form-grid-three">
+                            <div class="field"><label>字幕</label><select class="select" id="inSubMode"><option value="zh" selected>中文</option><option value="off">关闭</option><option value="en">英文</option><option value="zh-en">中英同屏</option><option value="both">中英分轨</option></select></div>
+                            <div class="field"><label>封面</label><select class="select" id="inCoverOrient"><option value="portrait">竖屏</option><option value="landscape">横屏</option></select></div>
+                            <div class="field"><label>最长时长</label><select class="select" id="inDurMax"><option value="">自动</option><option value="60">1分钟</option><option value="600">10分钟</option><option value="1800">30分钟</option><option value="3600">60分钟</option></select></div>
+                        </div>
+                        <div class="field"><label>附加指令</label><textarea class="textarea" id="inInstr" style="min-height:70px;" placeholder="例如：更口语化、每句不超过20字"></textarea></div>
+                        <div class="field"><label>语音样本</label><div class="row"><button class="btn btn-small" id="btnUploadVoiceSample"><i class="fas fa-microphone"></i>上传</button><span class="muted2" id="voiceSampleHint">未上传</span></div></div>
+                        <div class="field"><label>视频样本</label><div class="row"><button class="btn btn-small" id="btnUploadAvatarSample"><i class="fas fa-video"></i>上传</button><span class="muted2" id="avatarSampleHint">未上传</span></div></div>
                     </div>
-                    <div class="inline-grid-two">
-                        <div class="inline-ctl">
-                            <span class="name">BGM 氛围</span>
-                            <select class="select" id="inBgm">
-                                <option value="">默认</option>
-                                <option value="none">无BGM</option>
-                                <option value="tech">科技感</option>
-                                <option value="cheerful">轻快</option>
-                                <option value="serious">严肃</option>
-                                <option value="relaxing">舒缓</option>
-                                <option value="warm">温暖</option>
-                                <option value="cinematic">电影感</option>
-                                <option value="lofi">LoFi</option>
-                                <option value="ambient">氛围</option>
-                                <option value="piano">钢琴</option>
-                                <option value="acoustic">原声吉他</option>
-                                <option value="hiphop">嘻哈节奏</option>
-                                <option value="edm">电子/EDM</option>
-                                <option value="synthwave">合成波</option>
-                                <option value="orchestral">史诗管弦</option>
-                                <option value="corporate">商务轻快</option>
-                                <option value="jazz">爵士</option>
-                                <option value="rock">摇滚</option>
-                            </select>
-                        </div>
-                        <div class="inline-ctl">
-                            <span class="name">BGM 曲目</span>
-                            <select class="select" id="inBgmTrack">
-                                <option value="">自动</option>
-                            </select>
-                            <div class="bgm-track-full" id="bgmTrackFull" style="display:none;"></div>
-                        </div>
-                    </div>
-                    <div class="inline-grid-three">
-                        <div class="inline-ctl wide">
-                            <span class="name">字幕</span>
-                            <select class="select" id="inSubMode">
-                                <option value="zh" selected>中文（默认）</option>
-                                <option value="off">关闭</option>
-                                <option value="en">英文</option>
-                                <option value="zh-en">中英同屏</option>
-                                <option value="both">中英（分轨）</option>
-                            </select>
-                        </div>
-                        <div class="inline-ctl wide">
-                            <span class="name">封面</span>
-                            <select class="select" id="inCoverOrient">
-                                <option value="portrait">竖屏</option>
-                                <option value="landscape">横屏</option>
-                            </select>
-                        </div>
-                        <div class="inline-ctl wide">
-                            <span class="name">最长时长</span>
-                            <select class="select" id="inDurMax">
-                                <option value="">自动</option>
-                                <option value="60">1分钟</option>
-                                <option value="600">10分钟</option>
-                                <option value="1800">30分钟</option>
-                                <option value="3600">60分钟</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="field grow" style="margin:0;">
-                            <label>附加指令（可选）</label>
-                            <textarea class="textarea" id="inInstr" style="min-height:84px;" placeholder="例如：更口语化、每句不超过20字"></textarea>
-                        </div>
-                    </div>
-                    <div class="field" style="margin:8px 0 12px;">
-                        <label>语音样本（可选）</label>
-                        <div class="row">
-                            <button class="btn btn-small" id="btnUploadVoiceSample" type="button"><i class="fas fa-microphone"></i>上传语音</button>
-                            <span class="muted2" id="voiceSampleHint">未上传</span>
-                        </div>
-                    </div>
-                    <div class="field" style="margin:0 0 12px;">
-                        <label>视频样本（可选）</label>
-                        <div class="row">
-                            <button class="btn btn-small" id="btnUploadAvatarSample" type="button"><i class="fas fa-video"></i>上传视频</button>
-                            <span class="muted2" id="avatarSampleHint">未上传</span>
-                        </div>
-                    </div>
-                    <div class="row" style="margin-top:16px; padding-top:12px; border-top:1px solid var(--stroke);">
-                        <button class="btn btn-primary grow" id="btnCreate" style="height:40px; font-size:14px;"><i class="fas fa-wand-magic-sparkles"></i>开始生成</button>
-                    </div>
+                    <div class="row" style="margin-top:16px; padding-top:12px; border-top:1px solid var(--stroke);"><button class="btn btn-primary grow" id="btnCreate" style="height:38px;"><i class="fas fa-wand-magic-sparkles"></i>开始生成</button></div>
                 </div>
             </div>
             </section>
 
-            <section class="ws-module" id="mod-task" data-module="task" data-size="narrow" draggable="false">
-            <div class="module-h">
-                <div class="title">2. 任务进度与脚本</div>
-                <div class="row">
-                    <button class="btn btn-small" id="btnOpenInProfile"><i class="fas fa-up-right-from-square"></i>个人页</button>
-                    <button class="btn btn-small" id="btnDispatch" style="display:none;"><i class="fas fa-truck-fast"></i>重试派发</button>
-                    <button class="btn btn-small" id="btnCancel"><i class="fas fa-ban"></i>取消</button>
-                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
-                </div>
-            </div>
+            <section class="ws-module" id="mod-task" data-module="task">
+            <div class="module-h"><div class="title">2. 任务进度与脚本</div><div class="row"><button class="btn btn-small" id="btnOpenInProfile"><i class="fas fa-up-right-from-square"></i>个人页</button><button class="btn btn-small" id="btnDispatch" style="display:none;"><i class="fas fa-truck-fast"></i>重试</button><button class="btn btn-small" id="btnCancel"><i class="fas fa-ban"></i>取消</button><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span></div></div>
             <div class="module-b">
-                <div class="row" style="justify-content:space-between; align-items:center;">
-                    <div class="tabs" style="padding:0;">
-                        <div class="tab active" data-tab="overview">概览</div>
-                        <div class="tab" data-tab="draft">脚本</div>
-                        <div class="tab" data-tab="history">回退</div>
-                    </div>
-                    <div class="row">
-                        <span class="badge" id="jobStatus">-</span>
-                        <span class="badge" id="jobProgress">0%</span>
-                    </div>
+                <div class="row" style="justify-content:space-between; margin-bottom:10px;">
+                    <div class="tabs"><div class="tab active" data-tab="overview">概览</div><div class="tab" data-tab="draft">脚本</div><div class="tab" data-tab="history">回退</div></div>
+                    <div class="row"><span class="badge" id="jobStatus">-</span><span class="badge" id="jobProgress">0%</span></div>
                 </div>
-                <div id="midBody" style="margin-top:10px;">
-                    <div id="tab_overview">
-                        <div class="card">
-                            <div class="row" style="justify-content:space-between;">
-                                <div style="font-weight:800;" id="jobTitle">未选择作品</div>
-                            </div>
-                            <div class="hr"></div>
-                            <div class="kv" style="margin-top:10px;">
-                                <div class="k">Job</div><div class="v" id="jobId">—</div>
-                                <div class="k">Post</div><div class="v" id="postId">—</div>
-                                <div class="k">Stage</div><div class="v" id="jobStage">—</div>
-                                <div class="k">Message</div><div class="v" id="jobMsg">—</div>
-                                <div class="k">Observability</div><div class="v" id="jobObs">—</div>
-                            </div>
-                            <div class="hr"></div>
-                            <div class="row" style="margin-top:16px;">
-                                <button class="btn btn-primary" id="btnRerun"><i class="fas fa-rotate-right"></i>按脚本重跑</button>
-                                <button class="btn" id="btnSuggest"><i class="fas fa-lightbulb"></i>AI建议脚本</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="tab_draft" style="display:none;">
-                        <div class="card">
-                            <div class="row" style="justify-content:space-between;">
-                                <div style="font-weight:700;">脚本编辑</div>
-                                <div class="row">
-                                    <label class="muted2" style="font-size:12px; display:flex; align-items:center; gap:8px;">
-                                        <input type="checkbox" id="toggleRaw" style="width:14px;height:14px;">编辑原始JSON
-                                    </label>
-                                    <button class="btn btn-primary btn-small" id="btnSaveDraft"><i class="fas fa-save"></i>保存</button>
-                                </div>
-                            </div>
-                            <div class="hr"></div>
-                            <textarea class="textarea editor" id="draftEditor" placeholder="这里将展示当前脚本..."></textarea>
-                            <div class="muted2" style="font-size:12px; margin-top:10px;">保存后会写入草稿版本，可在“回退”中一键恢复。</div>
-                        </div>
-                    </div>
-
-                    <div id="tab_history" style="display:none;">
-                        <div class="card">
-                            <div class="row" style="justify-content:space-between;">
-                                <div style="font-weight:700;">草稿历史</div>
-                                <button class="btn btn-small" id="btnReloadHistory"><i class="fas fa-rotate"></i>刷新</button>
-                            </div>
-                            <div class="hr"></div>
-                            <div id="historyList" class="list"></div>
-                        </div>
-                    </div>
+                <div id="midBody">
+                    <div id="tab_overview"><div class="card"><div style="font-weight:700;" id="jobTitle">未选择作品</div><div class="kv" style="margin-top:10px;"><div class="k">Job</div><div class="v" id="jobId">—</div><div class="k">Post</div><div class="v" id="postId">—</div><div class="k">Stage</div><div class="v" id="jobStage">—</div><div class="k">Message</div><div class="v" id="jobMsg">—</div><div class="k">Observability</div><div class="v" id="jobObs">—</div></div><div class="row" style="margin-top:12px;"><button class="btn btn-primary" id="btnRerun"><i class="fas fa-rotate-right"></i>重跑</button><button class="btn" id="btnSuggest"><i class="fas fa-lightbulb"></i>AI建议</button></div></div></div>
+                    <div id="tab_draft" style="display:none;"><div class="card"><div class="row" style="justify-content:space-between;"><div style="font-weight:700;">脚本编辑</div><div class="row"><label class="muted2" style="font-size:12px;"><input type="checkbox" id="toggleRaw"> 原始JSON</label><button class="btn btn-primary btn-small" id="btnSaveDraft"><i class="fas fa-save"></i>保存</button></div></div><textarea class="textarea" id="draftEditor" style="min-height:200px; font-family:monospace; font-size:12px;" placeholder="脚本内容..."></textarea></div></div>
+                    <div id="tab_history" style="display:none;"><div class="card"><div class="row" style="justify-content:space-between;"><div style="font-weight:700;">草稿历史</div><button class="btn btn-small" id="btnReloadHistory"><i class="fas fa-rotate"></i>刷新</button></div><div id="historyList" style="margin-top:10px;"></div></div></div>
                 </div>
-                <div class="right-events" style="margin-top:12px; border-radius:12px;">
-                    <div class="section-head">
-                        <div class="t">事件流</div>
-                        <div class="section-tag" id="evHint">—</div>
-                    </div>
-                    <div id="evLog" class="muted" style="font-size:12px; line-height:1.5; white-space:pre-wrap; max-height:210px; overflow:auto;"></div>
-                </div>
+                <div style="margin-top:12px; padding-top:10px; border-top:1px solid var(--stroke);"><div style="font-size:12px; font-weight:600; margin-bottom:6px;">事件流</div><div id="evLog" class="muted2" style="font-size:11px; max-height:140px; overflow-y:auto; white-space:pre-wrap;"></div></div>
             </div>
             </section>
 
-            <section class="ws-module" id="mod-preview" data-module="preview" data-size="narrow" draggable="false">
-            <div class="module-h">
-                <div class="title">3. 视频预览</div>
-                <div class="row">
-                    <button class="btn btn-small" id="btnReloadPreview"><i class="fas fa-rotate"></i>刷新</button>
-                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
-                </div>
-            </div>
+            <section class="ws-module" id="mod-preview" data-module="preview">
+            <div class="module-h"><div class="title">3. 视频预览</div><div class="row"><button class="btn btn-small" id="btnReloadPreview"><i class="fas fa-rotate"></i>刷新</button><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span></div></div>
             <div class="module-b">
-                <div class="card">
-                    <div class="video-preview-wrap" style="position:relative;display:block;background:#000;">
-                        <video id="videoEl" class="video" controls playsinline></video>
-                    </div>
-                    <div class="hr"></div>
-                    <div class="row" style="flex-wrap:wrap; gap:8px;">
-                        <button class="btn btn-primary btn-small" id="btnPublishPost"><i class="fas fa-paper-plane"></i>发布</button>
-                        <button class="btn btn-small" id="btnToggleDownload"><i class="fas fa-unlock"></i><span>下载：关</span></button>
-                        <button class="btn btn-small" id="btnListMedia"><i class="fas fa-layer-group"></i>版本</button>
-                        <button class="btn btn-small" id="btnOpenPost"><i class="fas fa-eye"></i>打开</button>
-                        <button class="btn btn-small" id="btnDownloadPost"><i class="fas fa-download"></i>下载</button>
-                    </div>
-                    <div class="field" id="previewSubSelWrap" style="margin:8px 12px 12px; display:none;">
-                        <label>字幕轨</label>
-                        <select class="select" id="subSel" style="max-width:180px;"><option value="off">字幕：关</option></select>
-                    </div>
-                    <div class="muted2" style="font-size:12px; padding:0 12px 12px; line-height:1.5;">生成完成后先预览，确认满意后再点击发布。</div>
-                    <div id="mediaList" class="list" style="margin-top:12px; display:none;"></div>
-                </div>
+                <div class="video-preview-wrap" style="background:#000; border-radius:var(--r-sm); overflow:hidden;"><video id="videoEl" class="video" controls playsinline></video></div>
+                <div class="row" style="flex-wrap:wrap; gap:8px; margin-top:10px;"><button class="btn btn-primary btn-small" id="btnPublishPost"><i class="fas fa-paper-plane"></i>发布</button><button class="btn btn-small" id="btnToggleDownload"><i class="fas fa-unlock"></i><span>下载：关</span></button><button class="btn btn-small" id="btnListMedia"><i class="fas fa-layer-group"></i>版本</button><button class="btn btn-small" id="btnOpenPost"><i class="fas fa-eye"></i>打开</button><button class="btn btn-small" id="btnDownloadPost"><i class="fas fa-download"></i>下载</button></div>
+                <div class="field" id="previewSubSelWrap" style="display:none;"><label>字幕轨</label><select class="select" id="subSel" style="max-width:160px;"><option value="off">字幕：关</option></select></div>
+                <div id="mediaList" style="display:none; margin-top:10px;"></div>
             </div>
             </section>
 
-            <section class="ws-module" id="mod-chat" data-module="chat" data-size="narrow" draggable="false">
-            <div class="module-h">
-                <div class="title">4. AI创作沟通</div>
-                <div class="row">
-                    <button class="btn btn-small" id="btnReloadChat"><i class="fas fa-rotate"></i>刷新</button>
-                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
-                </div>
-            </div>
+            <section class="ws-module" id="mod-chat" data-module="chat">
+            <div class="module-h"><div class="title">4. AI创作沟通</div><div class="row"><button class="btn btn-small" id="btnReloadChat"><i class="fas fa-rotate"></i>刷新</button><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span></div></div>
             <div class="module-b">
-                <div class="card">
-                    <div class="chat">
-                        <div id="chatLog" class="chat-log"></div>
-                        <div class="chat-input">
-                            <textarea class="textarea grow" id="chatInput" placeholder="例如：把开头更抓人；每段加一句总结；增加一个案例..."></textarea>
-                            <button class="btn btn-primary" id="btnSendChat"><i class="fas fa-paper-plane"></i>发送</button>
-                        </div>
-                        <div class="row">
-                            <button class="btn btn-small" id="btnChatSuggest"><i class="fas fa-wand-magic-sparkles"></i>对话建议</button>
-                            <button class="btn btn-small" id="btnReviseFromChat"><i class="fas fa-clone"></i>生成新版本</button>
-                        </div>
-                        <div class="muted2" style="font-size:12px;">“生成新版本”会创建新的 job 并把当前 post 绑定到新 job。</div>
-                    </div>
-                </div>
+                <div id="chatLog" class="chat-log"></div>
+                <div class="chat-input"><textarea class="textarea grow" id="chatInput" placeholder="例如：把开头更抓人；每段加一句总结..."></textarea><button class="btn btn-primary" id="btnSendChat"><i class="fas fa-paper-plane"></i>发送</button></div>
+                <div class="row" style="margin-top:8px;"><button class="btn btn-small" id="btnChatSuggest"><i class="fas fa-wand-magic-sparkles"></i>对话建议</button><button class="btn btn-small" id="btnReviseFromChat"><i class="fas fa-clone"></i>生成新版本</button></div>
             </div>
             </section>
 
-            <section class="ws-module" id="mod-works" data-module="works" data-size="narrow" draggable="false">
-            <div class="module-h">
-                <div class="title" id="worksTitle">5. 我的创作（0）</div>
-                <div class="row">
-                    <button class="btn btn-small" id="btnWorksCompact">紧凑</button>
-                    <button class="btn btn-small" id="btnWorksCard">卡片</button>
-                    <button class="btn btn-small" id="btnRefreshPosts"><i class="fas fa-rotate"></i>刷新</button>
-                    <span class="drag-handle" title="拖动模块"><i class="fas fa-grip-vertical"></i></span>
-                </div>
-            </div>
-            <div class="module-b">
-                <div class="field" style="margin-top:10px;">
-                    <label>筛选</label>
-                    <select class="select" id="postFilter">
-                        <option value="all">全部</option>
-                        <option value="queued">queued</option>
-                        <option value="processing">processing</option>
-                        <option value="preview">preview</option>
-                        <option value="done">done</option>
-                        <option value="failed">failed</option>
-                        <option value="returned">returned</option>
-                    </select>
-                </div>
-                <div class="list works-card-list" id="postList">
-                    <div class="muted2" id="postListEmpty" style="padding:24px 12px; text-align:center; font-size:13px;">暂无创作，请先在左侧创建任务</div>
-                </div>
-                <div class="row" style="margin-top:10px;">
-                    <button class="btn btn-small grow" id="btnLoadMorePosts" style="display:none;"><i class="fas fa-angles-down"></i>加载更多</button>
-                </div>
+            <section class="ws-module" id="mod-works" data-module="works">
+            <div class="module-h"><div class="title" id="worksTitle">5. 我的创作（0）</div><div class="row"><button class="btn btn-small" id="btnRefreshPosts"><i class="fas fa-rotate"></i>刷新</button><span class="drag-handle"><i class="fas fa-grip-vertical"></i></span></div></div>
+            <div class="module-b" id="worksModuleBody">
+                <div class="field"><label>筛选</label><select class="select" id="postFilter"><option value="all">全部</option><option value="queued">queued</option><option value="processing">processing</option><option value="preview">preview</option><option value="done">done</option><option value="failed">failed</option><option value="returned">returned</option></select></div>
+                <div class="list" id="postList"><div class="muted2" id="postListEmpty" style="padding:20px; text-align:center; font-size:13px;">暂无创作，请先创建任务</div></div>
             </div>
             </section>
         </div>
     </div>
 
     <div class="toast" id="toast"></div>
-    <div id="chainDiagBadge" style="display:none; position:fixed; right:10px; bottom:10px; z-index:2147483647; background:rgba(0,0,0,0.78); color:#fff; border:1px solid rgba(255,255,255,0.22); border-radius:10px; padding:8px 10px; font-size:11px; line-height:1.35; max-width:min(58vw,540px); white-space:pre-wrap;"></div>
+    <div id="chainDiagBadge" style="display:none; position:fixed; right:10px; bottom:10px; z-index:9999; background:rgba(0,0,0,0.8); color:#fff; padding:8px; font-size:11px; border-radius:8px;"></div>
 
     <script src="/static/js/hls.min.js"></script>
     <script src="{{ asset_url('js/app/studio.js') }}"></script>
     <script>
-        (function () {
-            const badge = document.getElementById('chainDiagBadge');
-            if (!badge) return;
-            const showBadge = () => {
-                const q = new URLSearchParams(location.search || '');
-                return q.get('debug_chain') === '1' || String(localStorage.getItem('aiseek_debug_chain') || '') === '1';
-            };
-            if (showBadge()) badge.style.display = '';
-            const build = '{{ build_id }}';
-            const entry = (document.querySelector('script[src*="studio.js"]') || {}).src || '';
-            let lastReport = '';
-            let lastReportTs = 0;
-            const probeSelect = function () {
-                try {
-                    const node = document.querySelector('#mod-task .title, #mod-create .title, .ws-module .title');
-                    if (!node) return { ok: false, len: 0 };
-                    const r = document.createRange();
-                    r.selectNodeContents(node);
-                    const s = window.getSelection();
-                    s.removeAllRanges();
-                    s.addRange(r);
-                    const txt = String(s.toString() || '');
-                    return { ok: txt.length > 0, len: txt.length };
-                } catch (_) {
-                    return { ok: false, len: 0 };
+        (function(){
+            const opt = document.getElementById('toggleOptional');
+            const optFields = document.getElementById('optionalFields');
+            if (opt && optFields) {
+                let collapsed = false;
+                opt.addEventListener('click', () => {
+                    collapsed = !collapsed;
+                    optFields.classList.toggle('collapsed', collapsed);
+                    opt.classList.toggle('collapsed', collapsed);
+                });
+            }
+            const board = document.getElementById('workspaceBoard');
+            const modules = board ? board.querySelectorAll('.ws-module') : [];
+            let dragged = null;
+            modules.forEach(mod => {
+                const h = mod.querySelector('.module-h');
+                if (h) {
+                    h.addEventListener('mousedown', (e) => {
+                        if (e.target.closest('button')) return;
+                        dragged = mod;
+                        mod.classList.add('dragging');
+                        const rect = mod.getBoundingClientRect();
+                        const ox = e.clientX - rect.left, oy = e.clientY - rect.top;
+                        const onMove = (ev) => {
+                            if (!dragged) return;
+                            const x = ev.clientX - ox, y = ev.clientY - oy;
+                            mod.style.position = 'fixed';
+                            mod.style.left = x + 'px';
+                            mod.style.top = y + 'px';
+                            mod.style.width = rect.width + 'px';
+                            mod.style.zIndex = 1000;
+                        };
+                        const onUp = (evUp) => {
+                            if (!dragged) return;
+                            mod.classList.remove('dragging');
+                            mod.style.position = '';
+                            mod.style.left = '';
+                            mod.style.top = '';
+                            mod.style.width = '';
+                            mod.style.zIndex = '';
+                            const mid = evUp.clientX, may = evUp.clientY;
+                            let best = null, bestD = Infinity;
+                            modules.forEach(m => {
+                                if (m === mod) return;
+                                const r = m.getBoundingClientRect();
+                                const cx = r.left + r.width/2, cy = r.top + r.height/2;
+                                const d = Math.hypot(mid - cx, may - cy);
+                                if (d < bestD) { bestD = d; best = m; }
+                            });
+                            if (best) board.insertBefore(mod, best);
+                            else board.appendChild(mod);
+                            try { if (window.studioSaveModuleOrder) window.studioSaveModuleOrder(); } catch (_) {}
+                            dragged = null;
+                            document.removeEventListener('mousemove', onMove);
+                            document.removeEventListener('mouseup', onUp);
+                        };
+                        document.addEventListener('mousemove', onMove);
+                        document.addEventListener('mouseup', onUp);
+                    });
                 }
-            };
-            const probeEvents = function () {
-                try {
-                    const node = document.querySelector('#mod-task .title, #mod-create .title, .ws-module .title');
-                    if (!node) return { pd_blocked: 0, md_blocked: 0, ss_blocked: 0 };
-                    const mk = (type) => {
-                        if (type === 'pointerdown' && typeof PointerEvent === 'function') return new PointerEvent(type, { bubbles: true, cancelable: true });
-                        if (type === 'mousedown') return new MouseEvent(type, { bubbles: true, cancelable: true });
-                        return new Event(type, { bubbles: true, cancelable: true });
-                    };
-                    const pd = mk('pointerdown'); node.dispatchEvent(pd);
-                    const md = mk('mousedown'); node.dispatchEvent(md);
-                    const ss = mk('selectstart'); node.dispatchEvent(ss);
-                    return { pd_blocked: pd.defaultPrevented ? 1 : 0, md_blocked: md.defaultPrevented ? 1 : 0, ss_blocked: ss.defaultPrevented ? 1 : 0 };
-                } catch (_) {
-                    return { pd_blocked: 1, md_blocked: 1, ss_blocked: 1 };
-                }
-            };
-            const reportProbe = function (payload) {
-                try {
-                    const qs = new URLSearchParams(payload || {});
-                    const u = '/api/v1/debug/client-probe/ping?' + qs.toString() + '&_=' + Date.now();
-                    try {
-                        if (navigator && typeof navigator.sendBeacon === 'function') {
-                            const ok = navigator.sendBeacon(u, new Blob([], { type: 'text/plain' }));
-                            if (ok) return;
-                        }
-                    } catch (_) {}
-                    try {
-                        const img = new Image();
-                        img.src = u;
-                    } catch (_) {}
-                } catch (_) {}
-            };
-            const paint = function (diag, selProbe) {
-                const latest = (diag && diag.latest) || {};
-                const probe = (diag && diag.probe) || {};
-                const cp = (diag && diag.client_probe && diag.client_probe.probe) || {};
-                const cpAge = Number((diag && diag.client_probe_age_sec) || 0);
-                const cpFresh = !!(diag && diag.client_probe_fresh);
-                const lines = [
-                    'chain:studio',
-                    'build=' + build,
-                    'instance=' + String((diag && diag.instance_id) || '-'),
-                    'entry=' + entry,
-                    'select=' + (selProbe.ok ? 'ok' : 'fail') + '(' + selProbe.len + ')',
-                    'job=' + String(latest.job_id || '-'),
-                    'status=' + String(latest.status || '-'),
-                    'draft_scenes=' + String(latest.draft_scenes || 0),
-                    'result_scenes=' + String(latest.result_scenes || 0),
-                    'cover=' + (latest.has_cover ? '1' : '0'),
-                    'probe_post=' + String(probe.post_id || 78),
-                    'probe_exist=' + String(probe.exists === false ? 0 : 1),
-                    'probe_ps=' + String(probe.result_scenes || 0),
-                    'ev_pd=' + String(cp.pd_blocked || 0),
-                    'ev_md=' + String(cp.md_blocked || 0),
-                    'ev_ss=' + String(cp.ss_blocked || 0),
-                    'probe_age=' + String(cpAge > 0 ? cpAge : 0) + 's',
-                    'probe_live=' + (cpFresh ? '1' : '0'),
-                ];
-                badge.textContent = lines.join('\n');
-            };
-            const run = function () {
-                const probe = probeSelect();
-                const evp = probeEvents();
-                fetch('/api/v1/debug/chain-status?post_id=78&_=' + Date.now(), { credentials: 'include', cache: 'no-store' })
-                    .then((r) => r.json())
-                    .then((j) => {
-                        paint(j, probe);
-                        try {
-                            const payload = {
-                                page: 'studio',
-                                build: build,
-                                entry: entry,
-                                href: String(location.href || ''),
-                                sel_ok: !!probe.ok,
-                                sel_len: Number(probe.len || 0),
-                                assets: (j && j.assets) || {},
-                                probe78: (j && j.probe) || {},
-                            };
-                            const sig = JSON.stringify(payload);
-                            const now = Date.now();
-                            if (sig !== lastReport || (now - lastReportTs) > 60000) {
-                                lastReport = sig;
-                                lastReportTs = now;
-                                const p = (j && j.probe) || {};
-                                const a = (j && j.assets) || {};
-                                reportProbe({
-                                    page: 'studio',
-                                    build: String(build || ''),
-                                    entry: String(entry || ''),
-                                    href: String(location.href || ''),
-                                    sel_ok: String(!!probe.ok),
-                                    sel_len: String(Number(probe.len || 0)),
-                                    probe_ps: String(Number(p.result_scenes || 0)),
-                                    probe_exist: String(p.exists === false ? 0 : 1),
-                                    actions_js: String(a.actions_js || ''),
-                                    pd_blocked: String(evp.pd_blocked || 0),
-                                    md_blocked: String(evp.md_blocked || 0),
-                                    ss_blocked: String(evp.ss_blocked || 0),
-                                });
-                            }
-                        } catch (_) {}
-                    })
-                    .catch(() => paint({}, probe));
-            };
-            run();
-            setInterval(run, 5000);
+            });
+            const worksBody = document.getElementById('worksModuleBody');
+            if (worksBody) {
+                worksBody.addEventListener('scroll', function() {
+                    const el = this;
+                    if (el.scrollHeight - el.scrollTop - el.clientHeight < 80 && window.studioLoadMore) window.studioLoadMore();
+                });
+            }
         })();
     </script>
 </body>
