@@ -51,6 +51,9 @@ jobs:
           fi
 
           cd "$PROJECT_DIR"
+          git fetch origin main
+          git reset --hard origin/main
+          git clean -fd
           cd deploy/aliyun
 
           chmod +x update.sh
