@@ -1,9 +1,7 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.core.config import get_settings
-
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session
 from app.models.all_models import Follow, Interaction, Post
 
 

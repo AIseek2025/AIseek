@@ -27,6 +27,20 @@ cd deploy/aliyun
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
+## 4.1 一键更新
+```bash
+cd deploy/aliyun
+chmod +x update.sh
+./update.sh
+```
+
+该脚本已内置：
+- 拉取 `origin/main`（`ff-only`）
+- 重建并重启 `backend/worker/nginx`
+- 自动迁移（带重试）
+- 容器内健康检查（带重试）
+- 失败自动回滚到更新前镜像
+
 ## 5. 发布前初始化（建议）
 ```bash
 cd /path/to/repo

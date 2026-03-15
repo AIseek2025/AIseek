@@ -7,6 +7,28 @@ on:
       - 'backend/**'
       - 'worker/**'
       - 'deploy/**'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Deploy branch"
+        required: true
+        default: "main"
+      services:
+        description: "Comma-separated services"
+        required: true
+        default: "backend,worker,nginx"
+      skip_migrate:
+        description: "Skip alembic migration"
+        required: true
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+      skip_health_check:
+        description: "Skip backend health check"
+        required: true
+        default: "false"
+        type: choice
+        options: ["false", "true"]
 
 jobs:
   deploy:
@@ -22,25 +44,29 @@ jobs:
         key: ${{ secrets.ALIYUN_SSH_KEY }}
         port: 22
         script: |
-          # 定义项目路径
+          set -e
           PROJECT_DIR="/root/AIseek-Trae-v1"
-          
-          # 1. 检查目录是否存在，不存在则克隆
+
           if [ ! -d "$PROJECT_DIR" ]; then
             echo "Project directory not found. Cloning from GitHub..."
             git clone https://github.com/AIseek2025/AIseek.git "$PROJECT_DIR"
           fi
-          
-          # 2. 进入项目目录并更新代码
+
           cd "$PROJECT_DIR"
-          echo "Updating code..."
-          git fetch origin
-          git reset --hard origin/main
-          
-          # 3. 进入部署脚本目录
           cd deploy/aliyun
-          
-          # 4. 赋予脚本执行权限并执行
+
           chmod +x update.sh
           echo "Running update script..."
-          ./update.sh
+          BRANCH="${{ github.event.inputs.branch || 'main' }}"
+          SERVICES="${{ github.event.inputs.services || 'backend,worker,nginx' }}"
+          SKIP_MIGRATE="${{ github.event.inputs.skip_migrate || 'false' }}"
+          SKIP_HEALTH="${{ github.event.inputs.skip_health_check || 'false' }}"
+
+          args=(--branch "$BRANCH" --services "$SERVICES")
+          if [ "$SKIP_MIGRATE" = "true" ]; then
+            args+=(--skip-migrate)
+          fi
+          if [ "$SKIP_HEALTH" = "true" ]; then
+            args+=(--skip-health-check)
+          fi
+          ./update.sh "${args[@]}"
