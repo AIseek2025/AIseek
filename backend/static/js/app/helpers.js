@@ -154,7 +154,9 @@ Object.assign(window.app, {
             } catch (_) {
                 this.switchTab('profile');
             }
-        } catch(e) {}
+        } catch(e) {
+            if (typeof this.toast === 'function') this.toast('删除失败');
+        }
     },
 
     renderShortcutRow: function(label, key) {

@@ -859,8 +859,8 @@ Object.assign(window.app, {
         const showFollow = (!this.state.user || (this.state.user.id !== post.user_id && !post.is_following));
         const canDownload = !!(post && post.download_enabled) || isOwner;
         const downloadBtn = canDownload ? `
-                        <div class="action-item" data-action="call" data-fn="downloadPost" data-args="[${post.id}]" data-stop="1">
-                            <div class="action-icon"><i class="fas fa-download"></i></div>
+                        <div class="action-item" data-action="call" data-fn="downloadPost" data-args="[${post.id}]" data-stop="1" title="下载">
+                            <div class="action-icon"><i class="fas fa-download" aria-hidden="true"></i></div>
                             <div class="action-text">下载</div>
                         </div>
         ` : '';
@@ -879,32 +879,32 @@ Object.assign(window.app, {
                 
                     <!-- Right Actions -->
                     <div class="video-actions">
-                        <div class="action-item avatar-action" data-action="call" data-fn="viewUserProfile" data-args="[${post.user_id}]" data-stop="1">
-                            <img src="${avatar}">
+                        <div class="action-item avatar-action" data-action="call" data-fn="viewUserProfile" data-args="[${post.user_id}]" data-stop="1" title="查看主页">
+                            <img src="${avatar}" alt="头像">
                             <div class="follow-plus" data-user-id="${post.user_id}" style="${showFollow ? '' : 'display:none;'}" data-action="call" data-fn="toggleFollow" data-args="[${post.user_id}]" data-pass-el="1" data-stop="1"><i class="fas fa-plus"></i></div>
                         </div>
-                        <div class="action-item" data-action="call" data-fn="toggleLike" data-args="[${post.id}]" data-pass-el="1" data-stop="1">
-                            <div class="action-icon"><i class="fas fa-heart" style="color:${post.is_liked ? '#fe2c55' : 'var(--text-color)'}"></i></div>
+                        <div class="action-item" data-action="call" data-fn="toggleLike" data-args="[${post.id}]" data-pass-el="1" data-stop="1" title="点赞">
+                            <div class="action-icon"><i class="fas fa-heart" style="color:${post.is_liked ? '#fe2c55' : 'var(--text-color)'}" aria-hidden="true"></i></div>
                             <div class="action-text">${post.likes_count || 0}</div>
                         </div>
-                        <div class="action-item" data-action="call" data-fn="openComments" data-args="[${post.id}]" data-pass-el="1" data-stop="1">
-                            <div class="action-icon"><i class="fas fa-comment-dots"></i></div>
+                        <div class="action-item" data-action="call" data-fn="openComments" data-args="[${post.id}]" data-pass-el="1" data-stop="1" title="评论">
+                            <div class="action-icon"><i class="fas fa-comment-dots" aria-hidden="true"></i></div>
                             <div class="action-text">${post.comments_count || 0}</div>
                         </div>
-                        <div class="action-item" data-action="call" data-fn="toggleFavorite" data-args="[${post.id}]" data-pass-el="1" data-stop="1">
-                        <div class="action-icon"><i class="${post.is_favorited ? 'fas' : 'far'} fa-star" style="color:${post.is_favorited ? '#ffb800' : 'var(--text-color)'}"></i></div>
+                        <div class="action-item" data-action="call" data-fn="toggleFavorite" data-args="[${post.id}]" data-pass-el="1" data-stop="1" title="收藏">
+                        <div class="action-icon"><i class="${post.is_favorited ? 'fas' : 'far'} fa-star" style="color:${post.is_favorited ? '#ffb800' : 'var(--text-color)'}" aria-hidden="true"></i></div>
                         <div class="action-text">${Number.isFinite(Number(post.favorites_count)) ? Number(post.favorites_count) : 0}</div>
                         </div>
-                        <div class="action-item" data-action="call" data-fn="openFloatingPlayer" data-args="[${post.id}]" data-stop="1">
-                            <div class="action-icon"><i class="fas fa-window-restore"></i></div>
+                        <div class="action-item" data-action="call" data-fn="openFloatingPlayer" data-args="[${post.id}]" data-stop="1" title="小窗播放">
+                            <div class="action-icon"><i class="fas fa-window-restore" aria-hidden="true"></i></div>
                             <div class="action-text">小窗</div>
                         </div>
-                        <div class="action-item" data-action="call" data-fn="toggleRepost" data-args="[${post.id}]" data-pass-el="1" data-stop="1">
-                            <div class="action-icon"><i class="fas fa-retweet" style="color:${post.is_reposted ? '#00d4ff' : 'var(--text-color)'}"></i></div>
+                        <div class="action-item" data-action="call" data-fn="toggleRepost" data-args="[${post.id}]" data-pass-el="1" data-stop="1" title="转发">
+                            <div class="action-icon"><i class="fas fa-retweet" style="color:${post.is_reposted ? '#00d4ff' : 'var(--text-color)'}" aria-hidden="true"></i></div>
                             <div class="action-text">${post.shares_count || 0}</div>
                         </div>
-                        <div class="action-item" data-action="call" data-fn="sharePost" data-args="[${post.id}]" data-stop="1">
-                            <div class="action-icon"><i class="fas fa-share"></i></div>
+                        <div class="action-item" data-action="call" data-fn="sharePost" data-args="[${post.id}]" data-stop="1" title="分享">
+                            <div class="action-icon"><i class="fas fa-share" aria-hidden="true"></i></div>
                             <div class="action-text">分享</div>
                         </div>
                         ${downloadBtn}
@@ -933,7 +933,7 @@ Object.assign(window.app, {
                         
                         <div class="v-controls-row">
                             <div class="v-left">
-                                 <i class="fas fa-play" id="btn-play-${post.id}" data-action="call" data-fn="togglePlayByPostId" data-args="[${post.id}]" data-stop="1"></i>
+                                 <i class="fas fa-play" id="btn-play-${post.id}" data-action="call" data-fn="togglePlayByPostId" data-args="[${post.id}]" data-stop="1" title="播放/暂停" aria-label="播放"></i>
                                  <span class="v-time" id="time-${post.id}">00:00 / 00:00</span>
                             </div>
                             

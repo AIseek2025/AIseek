@@ -300,6 +300,7 @@ Object.assign(window.app, {
         } catch(e) {
             console.error(e);
             if (els.list) els.list.innerHTML = '<div style="color:#888; text-align:center; padding:20px;">加载失败</div>';
+            if (typeof this.toast === 'function') this.toast('评论加载失败');
         }
     },
 

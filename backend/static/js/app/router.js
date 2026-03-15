@@ -59,7 +59,8 @@ Object.assign(window.app, {
         }
         if (page === 'profile') navs[4].classList.add('active'); // Adjust index if needed
         if (page === 'settings') {
-             if(navs[7]) navs[7].classList.add('active');
+             const settingsNav = document.getElementById('nav-settings');
+             if (settingsNav) settingsNav.classList.add('active');
         }
         if (page === 'creator') {
         }
@@ -81,7 +82,16 @@ Object.assign(window.app, {
             if (this.state.user) this.loadFollowingPage();
         }
         if (page === 'friends') {
-            if (this.state.user) this.loadFriendsPage();
+            if (this.state.user) {
+                this.loadFriendsPage();
+                setTimeout(() => {
+                    try {
+                        const panel = document.getElementById('friends_main_panel');
+                        const feed = panel && panel.querySelector('.friend-feed-container');
+                        if (feed) feed.querySelectorAll('video').forEach(v => { try { v.load(); } catch (_) {} });
+                    } catch (_) {}
+                }, 150);
+            }
         }
         if (page === 'profile') {
             if (!this.state.user) return this.openModal('authModal');
