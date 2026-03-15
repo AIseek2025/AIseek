@@ -69,11 +69,11 @@
         * { box-sizing: border-box; }
         body { margin: 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; background: radial-gradient(1200px 520px at 4% -12%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 62%), var(--bg); color: var(--text); }
         a { color: inherit; text-decoration: none; }
-        .topbar { height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: color-mix(in srgb, var(--bg) 94%, #000 6%); position: sticky; top: 0; z-index: 20; border-bottom: 0; backdrop-filter: blur(8px); box-shadow: 0 8px 20px rgba(0,0,0,0.10); }
+        .topbar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: color-mix(in srgb, var(--bg) 96%, #000 4%); position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--stroke); backdrop-filter: blur(12px); }
         .topbar .row { flex-wrap: nowrap; gap: 8px; min-width: 0; }
         .topbar .row:last-child { margin-left: auto; justify-content: flex-end; flex: 1; }
-        .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.3px; }
-        .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px; letter-spacing: -0.02em; }
+        .brand .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 8px var(--primary); }
         .pill { display: inline-flex; align-items: center; gap: var(--s-1); padding: 8px 11px; border-radius: 999px; background: var(--surface-soft); border: 1px solid var(--stroke); transition: all var(--dur-fast) cubic-bezier(.2,.8,.2,1); }
         .pill:hover { background: var(--surface); }
         .btn { display: inline-flex; align-items: center; gap: var(--s-1); border: 0; cursor: pointer; border-radius: var(--r-sm); height: 36px; padding: 0 12px; background: var(--surface-soft); color: var(--text); border: 1px solid var(--stroke); transition: all var(--dur-fast) cubic-bezier(.2,.8,.2,1); font-size: 13px; font-weight: 600; }
@@ -89,11 +89,12 @@
         .workspace-board::-webkit-scrollbar { width: 8px; height: 8px; }
         .workspace-board::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 999px; }
         .workspace-board::-webkit-scrollbar-track { background: transparent; }
-        .ws-module { width: 100%; break-inside: avoid; margin: 0 0 var(--s-2); background: color-mix(in srgb, var(--surface) 96%, transparent); border: 1px solid var(--stroke); border-radius: var(--r-lg); overflow: hidden; display: flex; flex-direction: column; min-height: 220px; box-shadow: 0 8px 18px color-mix(in srgb, #000 8%, transparent); }
+        .ws-module { width: 100%; break-inside: avoid; margin: 0 0 var(--s-2); background: color-mix(in srgb, var(--surface) 98%, transparent); border: 1px solid var(--stroke); border-radius: var(--r-md); overflow: hidden; display: flex; flex-direction: column; min-height: 220px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: box-shadow var(--dur-base) ease; }
+        .ws-module:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .ws-module[data-size="wide"] { width: 100%; }
         .ws-module.dragging { opacity: .66; transform: scale(.995); }
-        .module-h { padding: 0 12px; border-bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--s-1); background: linear-gradient(90deg, var(--title-bg), color-mix(in srgb, var(--title-bg) 84%, #000 16%)); height: 44px; min-height: 44px; }
-        .module-h .title { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.2px; color: #fff; }
+        .module-h { padding: 0 14px; border-bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: var(--s-1); background: linear-gradient(135deg, var(--title-bg), color-mix(in srgb, var(--title-bg) 78%, #000 22%)); height: 42px; min-height: 42px; }
+        .module-h .title { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.03em; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
         .module-b { padding: var(--s-2); overflow: visible; min-height: 0; flex: 1; background: transparent; }
         .module-b::-webkit-scrollbar { width: 8px; height: 8px; }
         .module-b::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 999px; }
@@ -118,10 +119,11 @@
         .muted { color: var(--muted); }
         .muted2 { color: var(--muted2); }
         .hr { display: none; }
-        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-        .field label { font-size: 12px; color: var(--muted); }
-        .input, .select, .textarea { background: var(--surface-soft); border: 1px solid var(--stroke); color: var(--text); border-radius: var(--r-sm); padding: 10px 12px; outline: none; transition: all var(--dur-fast) ease; }
-        .input:focus, .select:focus, .textarea:focus { border-color: rgba(254,44,85,0.62); box-shadow: 0 0 0 2px rgba(254,44,85,0.18); }
+        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+        .field label { font-size: 12px; font-weight: 600; color: var(--muted); }
+        .input, .select, .textarea { background: var(--surface-soft); border: 1px solid var(--stroke); color: var(--text); border-radius: var(--r-sm); padding: 10px 12px; outline: none; transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease; font-size: 13px; }
+        .input:focus, .select:focus, .textarea:focus { border-color: rgba(254,44,85,0.55); box-shadow: 0 0 0 2px rgba(254,44,85,0.18); }
+        .input::placeholder, .textarea::placeholder { color: var(--muted2); }
         .select { width: 100%; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .textarea { min-height: 140px; resize: vertical; }
         .row { display: flex; gap: var(--s-1); align-items: center; flex-wrap: wrap; }
@@ -129,7 +131,7 @@
         .form-grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .form-grid-three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         .inline-grid-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); margin-bottom: 12px; }
-        .inline-grid-three { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); margin-bottom: 12px; }
+        .inline-grid-three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--s-2); margin-bottom: 12px; }
         .inline-ctl { display: flex; align-items: center; gap: var(--s-1); }
         .inline-ctl .name { font-size: 12px; color: var(--muted); min-width: 42px; white-space: nowrap; }
         .inline-ctl .select { flex: 1; min-width: 0; }
@@ -175,8 +177,9 @@
         .msg.assistant { border-color: rgba(96,165,250,0.25); }
         .msg .r { font-size: 11px; color: var(--muted2); margin-bottom: 6px; }
         .msg .c { white-space: pre-wrap; font-size: 13px; line-height: 1.55; color: rgba(255,255,255,0.88); }
-        .chat-input { display: flex; gap: 8px; }
-        .chat-input textarea { min-height: 132px; resize: vertical; }
+        .chat-input { display: flex; gap: 10px; align-items: flex-start; }
+        .chat-input textarea { min-height: 100px; resize: vertical; flex: 1; min-width: 0; }
+        .chat-input .btn-primary { flex-shrink: 0; align-self: stretch; }
         .works-card-list.compact .card { padding: 7px 8px; border-radius: var(--r-sm); }
         .works-card-list.compact .card-sub { font-size: 11px; margin-top: 4px; }
         .works-card-list.compact .card-title .t { font-size: 12px; max-width: 180px; }
@@ -190,7 +193,7 @@
         @media (max-width: 1320px) {
             #buildTag { display: none; }
         }
-        @media (max-width: 1200px) {
+            @media (max-width: 1200px) {
             .layout { height: auto; min-height: 0; }
             .workspace-board { height: auto; column-count: 1; }
             #mod-create, #mod-task, #mod-preview, #mod-chat, #mod-works { min-height: 0; }
@@ -198,6 +201,7 @@
             .form-grid-two, .form-grid-three { grid-template-columns: 1fr; }
             .inline-grid-two, .inline-grid-three { grid-template-columns: 1fr; }
             .topbar .row:last-child { flex: 1; justify-content: flex-end; }
+            #layoutPreset { display: none; }
         }
     </style>
     <script>
@@ -229,11 +233,17 @@
             <span class="muted2" id="buildTag">{{ build_id }}</span>
         </div>
         <div class="row">
-            <button class="btn btn-small" id="btnTheme"><i class="fas fa-circle-half-stroke"></i><span id="themeLabel">主题</span></button>
-            <button class="btn btn-small" id="btnTitleTone"><i class="fas fa-fill-drip"></i><span id="titleToneLabel">红阶</span></button>
-            <button class="btn btn-small" id="btnBrand"><i class="fas fa-palette"></i><span id="brandLabel">稳重</span></button>
-            <button class="btn btn-small" id="btnDensity"><i class="fas fa-arrows-up-down"></i><span id="densityLabel">舒适</span></button>
-            <button class="btn btn-small" id="btnResetLayout"><i class="fas fa-rotate-left"></i><span>重置</span></button>
+            <select class="select" id="layoutPreset" style="width:auto; min-width:100px; height:32px; padding:0 8px; font-size:12px;">
+                <option value="create">布局：创作优先</option>
+                <option value="task">布局：任务优先</option>
+                <option value="preview">布局：预览优先</option>
+                <option value="custom">自定义</option>
+            </select>
+            <button class="btn btn-small" id="btnTheme" title="切换深色/浅色"><i class="fas fa-circle-half-stroke"></i><span id="themeLabel">主题</span></button>
+            <button class="btn btn-small" id="btnTitleTone" title="标题栏颜色"><i class="fas fa-fill-drip"></i><span id="titleToneLabel">红阶</span></button>
+            <button class="btn btn-small" id="btnBrand" title="品牌色"><i class="fas fa-palette"></i><span id="brandLabel">稳重</span></button>
+            <button class="btn btn-small" id="btnDensity" title="间距密度"><i class="fas fa-arrows-up-down"></i><span id="densityLabel">舒适</span></button>
+            <button class="btn btn-small" id="btnResetLayout" title="重置模块顺序"><i class="fas fa-rotate-left"></i><span>重置</span></button>
         </div>
     </div>
 
@@ -247,12 +257,11 @@
                 </div>
             </div>
             <div class="module-b">
-                <div id="loginBox" class="card">
-                    <div class="row" style="justify-content:space-between;">
-                        <div style="font-weight:700;">登录</div>
-                        <div class="muted2" style="font-size:12px;">账号与主站共用</div>
+                <div id="loginBox" class="card" style="padding:20px;">
+                    <div class="row" style="justify-content:space-between; margin-bottom:16px;">
+                        <div style="font-weight:700; font-size:15px;">登录工作台</div>
+                        <span class="muted2" style="font-size:11px;">与主站账号通用</span>
                     </div>
-                    <div class="hr"></div>
                     <div class="field">
                         <label>用户名</label>
                         <input class="input" id="loginUser" placeholder="admin / testuser / demo">
@@ -261,15 +270,15 @@
                         <label>密码</label>
                         <input class="input" id="loginPass" type="password" placeholder="admin123 / test123 / demo123">
                     </div>
-                    <div class="row">
+                    <div class="row" style="gap:10px; margin-top:8px;">
                         <button class="btn btn-primary grow" id="btnLogin"><i class="fas fa-right-to-bracket"></i>登录</button>
-                        <button class="btn grow" id="btnQuickAdmin">Admin</button>
+                        <button class="btn grow" id="btnQuickAdmin">Admin 快捷</button>
                     </div>
                 </div>
 
                 <div id="createBox" class="card" style="display:none;">
-                    <div class="row" style="justify-content:flex-end;">
-                        <span class="badge" id="cooldownBadge" style="display:none;">冷却中</span>
+                    <div class="row" style="justify-content:flex-end; margin-bottom:4px;">
+                        <span class="badge warn" id="cooldownBadge" style="display:none;"><i class="fas fa-clock"></i> 冷却中</span>
                     </div>
                     <div class="field">
                         <label>标题（可选）</label>
@@ -280,8 +289,8 @@
                         <input class="input" id="inTags" placeholder="多个标签用空格/逗号分隔，如 AI 创作 科普">
                     </div>
                     <div class="field">
-                        <label>用户文稿（将转为口播稿/脚本）</label>
-                            <textarea class="textarea" id="inContent" placeholder="粘贴你的长文稿或要点..."></textarea>
+                        <label>用户文稿（必填，将转为口播稿/脚本）</label>
+                        <textarea class="textarea" id="inContent" placeholder="粘贴你的长文稿或要点，支持多段文本..."></textarea>
                     </div>
                     <div class="inline-grid-two">
                         <div class="inline-ctl">
@@ -349,9 +358,7 @@
                                 <option value="landscape">横屏</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="inline-grid-two">
-                        <div class="inline-ctl">
+                        <div class="inline-ctl wide">
                             <span class="name">最长时长</span>
                             <select class="select" id="inDurMax">
                                 <option value="">自动</option>
@@ -382,8 +389,8 @@
                             <span class="muted2" id="avatarSampleHint">未上传</span>
                         </div>
                     </div>
-                    <div class="row" style="margin-top:12px;">
-                        <button class="btn btn-primary grow" id="btnCreate"><i class="fas fa-wand-magic-sparkles"></i>开始生成</button>
+                    <div class="row" style="margin-top:16px; padding-top:12px; border-top:1px solid var(--stroke);">
+                        <button class="btn btn-primary grow" id="btnCreate" style="height:40px; font-size:14px;"><i class="fas fa-wand-magic-sparkles"></i>开始生成</button>
                     </div>
                 </div>
             </div>
@@ -419,11 +426,11 @@
                             </div>
                             <div class="hr"></div>
                             <div class="kv" style="margin-top:10px;">
-                                <div class="k">Job</div><div class="v" id="jobId">-</div>
-                                <div class="k">Post</div><div class="v" id="postId">-</div>
-                                <div class="k">Stage</div><div class="v" id="jobStage">-</div>
-                                <div class="k">Message</div><div class="v" id="jobMsg">-</div>
-                                <div class="k">Observability</div><div class="v" id="jobObs">-</div>
+                                <div class="k">Job</div><div class="v" id="jobId">—</div>
+                                <div class="k">Post</div><div class="v" id="postId">—</div>
+                                <div class="k">Stage</div><div class="v" id="jobStage">—</div>
+                                <div class="k">Message</div><div class="v" id="jobMsg">—</div>
+                                <div class="k">Observability</div><div class="v" id="jobObs">—</div>
                             </div>
                             <div class="hr"></div>
                             <div class="row" style="margin-top:16px;">
@@ -464,7 +471,7 @@
                 <div class="right-events" style="margin-top:12px; border-radius:12px;">
                     <div class="section-head">
                         <div class="t">事件流</div>
-                        <div class="section-tag" id="evHint">-</div>
+                        <div class="section-tag" id="evHint">—</div>
                     </div>
                     <div id="evLog" class="muted" style="font-size:12px; line-height:1.5; white-space:pre-wrap; max-height:210px; overflow:auto;"></div>
                 </div>
@@ -485,13 +492,18 @@
                         <video id="videoEl" class="video" controls playsinline></video>
                     </div>
                     <div class="hr"></div>
-                    <div class="row">
+                    <div class="row" style="flex-wrap:wrap; gap:8px;">
                         <button class="btn btn-primary btn-small" id="btnPublishPost"><i class="fas fa-paper-plane"></i>发布</button>
+                        <button class="btn btn-small" id="btnToggleDownload"><i class="fas fa-unlock"></i><span>下载：关</span></button>
                         <button class="btn btn-small" id="btnListMedia"><i class="fas fa-layer-group"></i>版本</button>
-                        <button class="btn btn-small" id="btnOpenPost"><i class="fas fa-eye"></i>打开作品页</button>
+                        <button class="btn btn-small" id="btnOpenPost"><i class="fas fa-eye"></i>打开</button>
                         <button class="btn btn-small" id="btnDownloadPost"><i class="fas fa-download"></i>下载</button>
                     </div>
-                    <div class="muted2" style="font-size:12px; padding:0 12px 12px;">生成完成后先预览，确认满意后再点击发布。</div>
+                    <div class="field" id="previewSubSelWrap" style="margin:8px 12px 12px; display:none;">
+                        <label>字幕轨</label>
+                        <select class="select" id="subSel" style="max-width:180px;"><option value="off">字幕：关</option></select>
+                    </div>
+                    <div class="muted2" style="font-size:12px; padding:0 12px 12px; line-height:1.5;">生成完成后先预览，确认满意后再点击发布。</div>
                     <div id="mediaList" class="list" style="margin-top:12px; display:none;"></div>
                 </div>
             </div>
@@ -546,7 +558,9 @@
                         <option value="returned">returned</option>
                     </select>
                 </div>
-                <div class="list works-card-list" id="postList"></div>
+                <div class="list works-card-list" id="postList">
+                    <div class="muted2" id="postListEmpty" style="padding:24px 12px; text-align:center; font-size:13px;">暂无创作，请先在左侧创建任务</div>
+                </div>
                 <div class="row" style="margin-top:10px;">
                     <button class="btn btn-small grow" id="btnLoadMorePosts" style="display:none;"><i class="fas fa-angles-down"></i>加载更多</button>
                 </div>
